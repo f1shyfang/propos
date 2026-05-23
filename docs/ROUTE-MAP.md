@@ -1,4 +1,4 @@
-# Route Map — Buyers Agent Platform (Hackathon MVP)
+# Route Map — Propos (Hackathon MVP)
 
 **Stack:** Next.js 16 App Router · TypeScript · Tailwind v4 · Supabase Auth
 **Auth:** Supabase email/password + session cookies via `@supabase/ssr`

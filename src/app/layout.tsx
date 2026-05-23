@@ -21,8 +21,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PropertyGo — Buyer's agent terminal",
-  description: "The unified platform for Australian buyer's agents",
+  title: "Propos — Buyer's agent terminal",
+  description: "The unified platform for Australian buyer's agents — briefs, matching, shortlists, and client feedback in one workspace.",
 };
 
 export default function RootLayout({

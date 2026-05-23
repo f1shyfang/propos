@@ -1,7 +1,7 @@
 # Technical Specification — Hackathon MVP
 
-**Project:** Buyers Agent Platform (48-hour hackathon, 3-person team)
-**Base:** `hack48-bloomberg/`
+**Project:** Propos (48-hour hackathon, 3-person team)
+**Base:** `propos` monorepo / Next.js app
 
 ---
 
@@ -176,7 +176,7 @@ The overriding rule: the demo must look fast and polished. No visible spinners, 
 ## 9. Setup Notes
 
 ### 9.1 package.json
-Rename `"name"` from `"hack48-ndis"` to `"buyers-agent"` during scaffold.
+Package name: `"propos"` in `package.json`.
 
 ### 9.2 Metadata
 Update `layout.tsx` metadata `title` and `description` from the default "Create Next App" to "BuyersAgent" and appropriate demo description.

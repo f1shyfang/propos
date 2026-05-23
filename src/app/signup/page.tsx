@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Logo } from "@/components/shared/logo";
 import { signup } from "../login/actions";
 
 type SearchParams = Promise<{ error?: string }>;
@@ -13,9 +14,12 @@ export default async function SignupPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
+      <Link href="/" className="no-underline" aria-label="Propos home">
+        <Logo />
+      </Link>
       <div>
         <h1 className="text-2xl font-semibold">Create an account</h1>
-        <p className="text-sm text-gray-500">Sign up with email and password.</p>
+        <p className="text-sm text-gray-500">Get started with Propos.</p>
       </div>
 
       <form action={signup} className="flex flex-col gap-3">

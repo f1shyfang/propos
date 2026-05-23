@@ -1,5 +1,6 @@
 {
-  "name": "hack48-ndis",
+  "name": "propos",
+  "description": "Propos — buyer's agent terminal for the Australian property market",
   "version": "0.1.0",
   "private": true,
   "scripts": {

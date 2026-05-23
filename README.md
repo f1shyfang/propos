@@ -1,6 +1,6 @@
-# hack48-ndis
+# Propos
 
-Next.js 15 (App Router, TypeScript, Tailwind v4) + Supabase auth starter.
+Next.js (App Router, TypeScript, Tailwind v4) + Supabase — unified workspace for Australian buyer's agents.
 
 ## Setup
 
