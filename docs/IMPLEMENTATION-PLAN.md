@@ -227,3 +227,118 @@ Run on each team member's machine:
 ---
 
 *Version: 1.1 | Last Updated: 2026-05-23* — Fixes: route group migration to (dashboard), GET /api/matches added to Person A, path conventions standardized, /api/v1 removed, property detail uses Client Component + React Query, shadcn components (table, sonner, dropdown-menu) added, src/middleware.ts creation assigned, Person A hours corrected to 12-16h, React Query hooks assigned to Person B (+3h), QueryClientProvider assigned to Person B, Person C static endpoints removed, FeedbackDisplay/FeedbackForm split, cursor→page/limit pagination, PropertyDetail reuse with optional props, env.local.example added, Tailwind v4 compat note added, Server Actions use plain async + useTransition documented, user_actions marked as stretch goal, staleTime: Infinity / gcTime: 30min on all React Query queries.
+
+---
+
+## Implementation Tasks
+
+Synthesized from this review's findings. Run with Claude Code; checkbox as you ship.
+
+- [ ] **T1 (P0, human: ~30min / CC: ~5min)** — supabase + src/lib/supabase — Add `SUPABASE_SERVICE_ROLE_KEY` to `.env.local.example` and create `src/lib/supabase/admin.ts` with `createAdminClient()` using the service role key
+  - Surfaced by: Architecture D2 — clients cannot UPDATE shortlists via anon-key RLS; service role bypasses RLS for feedback writes
+  - Files: `.env.local.example`, `src/lib/supabase/admin.ts`
+  - Verify: `POST /api/feedback` as Sarah's session successfully updates `shortlists.status` and `feedback_text`
+
+- [ ] **T2 (P0, human: ~5min / CC: ~2min)** — supabase/migrations — Add agent SELECT policy on `shortlists`
+  - Surfaced by: Architecture D3 — no SELECT policy for agents; agent calls to `GET /api/shortlists` return empty arrays
+  - Files: `supabase/migrations/0002_schema.sql`
+  - Verify: `SELECT * FROM shortlists` as `agent@demo.com` in Supabase SQL Editor returns rows
+  - SQL: `CREATE POLICY "Agents read shortlists for own briefs" ON shortlists FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM buyer_briefs WHERE id = shortlists.buyer_brief_id AND agent_id = auth.uid()));`
+
+- [ ] **T3 (P2, human: ~10min / CC: ~2min)** — src/app/api/shortlists — Guard `POST /api/shortlists`: return 400 if `brief.client_id` is null
+  - Surfaced by: Architecture D4 — Briefs 2+3 have `client_id = NULL`; unchecked INSERT throws Postgres NOT NULL violation (500 crash)
+  - Files: `src/app/api/shortlists/route.ts`
+  - Verify: `POST /api/shortlists` with `buyer_brief_id` = Brief 2 returns `{"error":"Brief has no linked client"}` with status 400
+
+- [ ] **T4 (P3, human: ~5min / CC: ~2min)** — src — Delete `src/proxy.ts`; remove stale `/protected` routing from `src/lib/supabase/middleware.ts`
+  - Surfaced by: Code Quality D5 — both files reference `/protected` (migrated to `(dashboard)`); neither is loaded by Next.js middleware
+  - Files: `src/proxy.ts` (delete), `src/lib/supabase/middleware.ts` (strip stale routing)
+  - Verify: `src/proxy.ts` absent; `src/lib/supabase/middleware.ts` contains no references to `/protected`
+
+- [ ] **T5 (P2, human: ~15min / CC: ~3min)** — src/app/api/properties — Use single nested Supabase select in `GET /api/properties/[id]`
+  - Surfaced by: Performance D6 — 4 sequential queries = 200–600ms extra latency; nested select is one round-trip
+  - Files: `src/app/api/properties/[id]/route.ts`
+  - Pattern: `supabase.from('properties').select('*, cma_records(*), risk_overlays(*), match_scores(*)').eq('id', id).single()`
+  - Verify: property detail page loads in < 200ms (measured via browser DevTools Network tab)
+
+- [ ] **T6 (P2, human: ~5min / CC: ~2min)** — docs — Document in TECH-SPEC: `GET /api/portal/shortlists` must NOT join `buyer_briefs` (clients cannot read that table via RLS)
+  - Surfaced by: Code Quality finding — `buyer_briefs` RLS is `agent_id = auth.uid()` only; portal join silently returns null brief data
+  - Files: `docs/TECH-SPEC.md`
+  - Correct portal query: `supabase.from('shortlists').select('*, property:properties(*)').eq('client_id', user.id)`
+
+---
+
+## NOT in Scope
+
+- Live API integrations (Domain, REA, CoreLogic) — deferred (API keys, rate limits)
+- Real AI/ML matching engine — pre-computed scores in seed data suffice
+- Off-market hub, offer letters, auction tracker — Phase 2/5 features
+- Document upload, email/SMS notifications, payment/subscription — deferred
+- Multi-tenancy / RBAC beyond two hardcoded demo users
+- Map view — 4+ hours for marginal demo value
+- WebSockets — polling via React Query is sufficient
+- Kanban/pipeline board — status column on shortlist table suffices
+- Comparison view test automation — manual demo verification sufficient for hackathon
+- `user_actions` event logging — stretch goal only (per Person A's plan)
+
+---
+
+## What Already Exists
+
+| Component | File | Status |
+|---|---|---|
+| Supabase auth (login/signup/signOut) | `src/app/login/actions.ts` | Complete, working |
+| Session refresh middleware | `src/lib/supabase/middleware.ts` | Complete (note: `updateSession` has stale /protected routing — T4) |
+| Route protection + role-based redirect | `src/middleware.ts` | Complete |
+| Supabase clients (browser, server, middleware) | `src/lib/supabase/` | Complete |
+| QueryClientProvider | `src/app/providers.tsx` | Complete (`staleTime: Infinity, gcTime: 30min`) |
+| TypeScript types | `src/lib/types.ts` | Complete |
+| Root layout with Providers + metadata | `src/app/layout.tsx` | Complete |
+| Agent dashboard placeholder | `src/app/(dashboard)/dashboard/page.tsx` | Scaffold only |
+| Client portal placeholder | `src/app/(portal)/portal/page.tsx` | Scaffold only |
+| Client portal login page | `src/app/(portal)/login/page.tsx` | Complete |
+| Database schema + RLS + indexes | `supabase/migrations/0002_schema.sql` | Complete (missing 2 policies — T1, T2) |
+| Full seed data (25 props, 75 CMA, 75 scores) | `supabase/migrations/0003_seed.sql` | Complete |
+
+---
+
+## Failure Modes
+
+| Codepath | Realistic Failure | Test | Error Handling | User Experience |
+|---|---|---|---|---|
+| `POST /api/feedback` (admin client) | `SUPABASE_SERVICE_ROLE_KEY` missing → crash on `createAdminClient()` | None | Needs try/catch returning 500 | Error toast — NOT silent (T1 prevents this) |
+| `POST /api/shortlists` (null client_id) | Postgres NOT NULL violation → 500 | None | Guard added via T3 | 400 error message — not silent after T3 |
+| `GET /api/properties/[id]` (sequential) | Timeout on 2nd/3rd query after 1st succeeds → partial data | None | Single nested select (T5) fails atomically | Rendering error or partial CMA — T5 prevents |
+| Agent shortlists SELECT | Empty array (no RLS policy) → blank shortlist UI | None | T2 adds policy | Silent blank screen — T2 prevents |
+| Client feedback UPDATE (without admin client) | RLS rejection → silent 204 with no data change | None | T1 (service role) prevents | Feedback appears submitted but doesn't save — T1 prevents |
+
+No critical gaps remain after T1–T6 are applied.
+
+---
+
+## Worktree Parallelization
+
+The plan already defines parallel lanes matching Person A, B, C assignments. No additional worktree strategy needed — the plan's lanes are:
+
+| Lane | Modules touched | Depends on |
+|---|---|---|
+| A (backend) | `src/app/api/`, `src/actions/`, `supabase/` | Auth (done) |
+| B (frontend, agent) | `src/app/(dashboard)/`, `src/components/`, `src/hooks/` | Lane A (Hour 8 checkpoint) |
+| C (frontend, client) | `src/app/(portal)/`, `src/components/shared/` | Lane A (Hour 16), Lane B (PropertyDetail component) |
+
+**Execution:** Launch Lanes A + B in parallel from Hour 0. Lane C starts Hour 2 (after seed verification). All three merge to `main` from Hour 20.
+
+---
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 5 issues, 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **UNRESOLVED:** 0 unresolved decisions
+- **VERDICT:** ENG CLEARED — all 5 issues addressed, 0 critical gaps. Ready to implement.
