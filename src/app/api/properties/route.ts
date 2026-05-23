@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm';
 
 function scoreToMatchPct(overall: number | null): number {
   if (!overall) return 50;
-  return Math.min(99, Math.max(40, Math.round((overall / 8000) * 100)));
+  return Math.min(99, Math.max(1, Math.round(overall / 100)));
 }
 
 function formatPrice(price: number | null, display: string | null): string {
