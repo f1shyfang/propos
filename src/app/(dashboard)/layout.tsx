@@ -1,13 +1,13 @@
+import { headers } from 'next/headers';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import { Sidebar } from '@/components/shared/sidebar';
 import { QuickFind } from '@/components/shared/quick-find';
-import { createClient } from '@/lib/supabase/server';
+import { auth } from '@/lib/auth';
 import { getUserDisplay } from '@/lib/user-display';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const userDisplay = getUserDisplay(user);
+  const sessionData = await auth.api.getSession({ headers: await headers() });
+  const userDisplay = getUserDisplay(sessionData?.user ?? null);
 
   return (
     <NuqsAdapter>

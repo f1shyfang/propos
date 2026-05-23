@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Logo } from "@/components/shared/logo";
-import { signup } from "../login/actions";
+import { SignupForm } from "./signup-form";
 
 type SearchParams = Promise<{ error?: string }>;
 
@@ -22,45 +22,7 @@ export default async function SignupPage({
         <p className="text-sm text-gray-500">Get started with Propos.</p>
       </div>
 
-      <form action={signup} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          Email
-          <input
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            className="rounded border border-gray-300 px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Password
-          <input
-            name="password"
-            type="password"
-            required
-            minLength={6}
-            autoComplete="new-password"
-            className="rounded border border-gray-300 px-3 py-2"
-          />
-        </label>
-
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-        <button
-          type="submit"
-          className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800"
-        >
-          Create account
-        </button>
-      </form>
-
-      <p className="text-sm text-gray-600">
-        Already have an account?{" "}
-        <Link href="/login" className="underline">
-          Sign in
-        </Link>
-      </p>
+      <SignupForm error={error} />
     </main>
   );
 }

@@ -1,19 +1,17 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
 
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { user } from "@/lib/db/schema";
 
 export async function updateProfile(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
+  const sessionData = await auth.api.getSession({ headers: await headers() });
+  if (!sessionData) redirect("/login");
 
   const full_name = String(formData.get("full_name") ?? "").trim();
   const organization = String(formData.get("organization") ?? "").trim();
@@ -22,13 +20,10 @@ export async function updateProfile(formData: FormData) {
     redirect(`/account?error=${encodeURIComponent("Name is required.")}`);
   }
 
-  const { error } = await supabase.auth.updateUser({
-    data: { full_name, organization },
-  });
-
-  if (error) {
-    redirect(`/account?error=${encodeURIComponent(error.message)}`);
-  }
+  await db
+    .update(user)
+    .set({ name: full_name, organization, updatedAt: new Date() })
+    .where(eq(user.id, sessionData.user.id));
 
   revalidatePath("/", "layout");
   redirect("/account?saved=1");

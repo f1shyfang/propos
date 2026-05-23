@@ -1,18 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { login, type LoginState } from "./actions";
-
-const initialState: LoginState = {};
+import { authClient } from "@/lib/auth-client";
 
 export function LoginForm({ message }: { message?: string }) {
-  const [state, formAction, pending] = useActionState(login, initialState);
+  const router = useRouter();
+  const [error, setError] = useState<string>();
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setError(undefined);
+    const form = e.currentTarget;
+    const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+    const password = (form.elements.namedItem("password") as HTMLInputElement).value;
+
+    const { error } = await authClient.signIn.email({ email, password });
+    if (error) {
+      setError(error.message ?? "Sign in failed. Check your email and password.");
+      setPending(false);
+      return;
+    }
+    router.push("/dashboard");
+    router.refresh();
+  }
 
   return (
     <>
-      <form action={formAction} className="flex flex-col gap-3">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
           Email
           <input
@@ -35,7 +54,7 @@ export function LoginForm({ message }: { message?: string }) {
         </label>
 
         {message ? <p className="text-sm text-green-600">{message}</p> : null}
-        {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
         <button
           type="submit"

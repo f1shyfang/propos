@@ -1,11 +1,12 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
 
 import { AccountProfileForm } from '@/components/shared/account-profile-form';
 import { TopBar } from '@/components/shared/top-bar';
 import { Icon } from '@/components/shared/icon';
-import { createClient } from '@/lib/supabase/server';
+import { SignOutButton } from '@/components/shared/sign-out-button';
+import { auth } from '@/lib/auth';
 import { getProfileFields, getUserDisplay } from '@/lib/user-display';
-import { signOut } from '@/app/login/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,8 +14,8 @@ type SearchParams = Promise<{ error?: string; saved?: string }>;
 
 export default async function AccountPage({ searchParams }: { searchParams: SearchParams }) {
   const { error, saved } = await searchParams;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const sessionData = await auth.api.getSession({ headers: await headers() });
+  const user = sessionData?.user ?? null;
   const display = getUserDisplay(user);
   const profile = getProfileFields(user);
 
@@ -51,12 +52,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Sear
             <Icon name="settings" size={13} />
             Settings
           </Link>
-          <form action={signOut}>
-            <button type="submit" className="pg-btn">
-              <Icon name="logout" size={13} />
-              Sign out
-            </button>
-          </form>
+          <SignOutButton />
         </div>
       </div>
     </div>

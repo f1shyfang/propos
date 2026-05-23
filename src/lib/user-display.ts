@@ -1,5 +1,3 @@
-import type { User } from "@supabase/supabase-js";
-
 export type UserDisplay = {
   name: string;
   email: string;
@@ -13,49 +11,29 @@ export type ProfileFields = {
   email: string;
 };
 
-export function getProfileFields(user: User | null): ProfileFields {
-  if (!user) {
-    return { fullName: "", organization: "", email: "" };
-  }
+type AuthUser = {
+  name?: string | null;
+  email?: string | null;
+  organization?: string | null;
+};
 
-  const meta = user.user_metadata ?? {};
-  const fullName =
-    (typeof meta.full_name === "string" && meta.full_name) ||
-    (typeof meta.name === "string" && meta.name) ||
-    "";
-  const organization =
-    (typeof meta.organization === "string" && meta.organization) ||
-    (typeof meta.company === "string" && meta.company) ||
-    "";
-
+export function getProfileFields(user: AuthUser | null): ProfileFields {
+  if (!user) return { fullName: "", organization: "", email: "" };
   return {
-    fullName,
-    organization,
+    fullName: user.name ?? "",
+    organization: user.organization ?? "",
     email: user.email ?? "",
   };
 }
 
-export function getUserDisplay(user: User | null): UserDisplay {
+export function getUserDisplay(user: AuthUser | null): UserDisplay {
   if (!user) {
-    return {
-      name: "Guest",
-      email: "",
-      org: "Propos",
-      initials: "G",
-    };
+    return { name: "Guest", email: "", org: "Propos", initials: "G" };
   }
 
-  const meta = user.user_metadata ?? {};
-  const fullName =
-    (typeof meta.full_name === "string" && meta.full_name) ||
-    (typeof meta.name === "string" && meta.name) ||
-    null;
   const email = user.email ?? "";
-  const name = fullName || email.split("@")[0] || "User";
-  const org =
-    (typeof meta.organization === "string" && meta.organization) ||
-    (typeof meta.company === "string" && meta.company) ||
-    "Buyer's agency";
+  const name = user.name || email.split("@")[0] || "User";
+  const org = user.organization || "Buyer's agency";
 
   const parts = name.trim().split(/\s+/).filter(Boolean);
   const initials =
