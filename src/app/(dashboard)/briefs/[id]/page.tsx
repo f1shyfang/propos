@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import { MatchScore } from '@/components/shared/match-score';
 import { PropertyThumb } from '@/components/shared/property-thumb';
+import { generateDefaultRoadmap, calcRoadmapDates, type RoadmapMilestone } from '@/lib/roadmap-utils';
 
 interface BriefMatch {
   id: string; address: string; suburb: string | null; state: string | null;
@@ -26,7 +27,7 @@ interface Brief {
   minBaths: number | null; status: string | null;
 }
 
-type Tab = 'matches' | 'shortlist';
+type Tab = 'matches' | 'shortlist' | 'roadmap';
 
 export default function BriefDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,6 +36,7 @@ export default function BriefDetailPage() {
   const [loading, setLoading] = useState(true);
   const [shortlisting, setShortlisting] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [roadmap, setRoadmap] = useState<RoadmapMilestone[] | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/briefs/${id}`);
@@ -103,7 +105,7 @@ export default function BriefDetailPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 0 }}>
-          {([['matches', `${matches.length} matches`], ['shortlist', `${shortlist.length} shortlisted`]] as [Tab, string][]).map(([t, l]) => (
+          {([['matches', `${matches.length} matches`], ['shortlist', `${shortlist.length} shortlisted`], ['roadmap', 'Roadmap']] as [Tab, string][]).map(([t, l]) => (
             <button key={t} onClick={() => setTab(t)} style={{
               background: 'none', border: 'none', padding: '10px 16px 12px', fontSize: 13,
               fontWeight: tab === t ? 500 : 400,
@@ -222,6 +224,77 @@ export default function BriefDetailPage() {
             )}
           </>
         )}
+
+        {tab === 'roadmap' && (
+          <RoadmapTab roadmap={roadmap} onInit={() => setRoadmap(generateDefaultRoadmap(new Date()))} onChange={setRoadmap} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RoadmapTab({ roadmap, onInit, onChange }: {
+  roadmap: RoadmapMilestone[] | null;
+  onInit: () => void;
+  onChange: (ms: RoadmapMilestone[]) => void;
+}) {
+  if (!roadmap) {
+    return (
+      <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--pg-text-dim)' }}>
+        <Icon name="calendar" size={36} color="var(--pg-text-very-faint)" />
+        <div style={{ fontSize: 15, marginTop: 14, fontWeight: 500 }}>No strategy roadmap yet</div>
+        <div style={{ fontSize: 13, marginTop: 6 }}>Generate a default timeline to share the purchase journey with your client.</div>
+        <button className="pg-btn pg-btn-primary" style={{ marginTop: 16 }} onClick={onInit}>
+          Generate roadmap
+        </button>
+      </div>
+    );
+  }
+
+  const totalDays = roadmap.reduce((s, m) => s + m.durationDays, 0);
+  const totalWeeks = Math.round(totalDays / 7);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: 'var(--pg-text-dim)' }}>
+          {roadmap.length} milestones · ~{totalWeeks} weeks total
+        </div>
+        <div style={{ flex: 1 }} />
+        <button className="pg-btn pg-btn-sm" onClick={onInit}>Reset to defaults</button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }} className="pg-card-flat">
+        {roadmap.map((m, i) => (
+          <div key={m.id} style={{
+            display: 'grid', gridTemplateColumns: '200px 1fr 120px 120px',
+            padding: '14px 16px', alignItems: 'center', gap: 16, fontSize: 13,
+            borderBottom: i < roadmap.length - 1 ? '1px solid var(--pg-border)' : 'none',
+          }}>
+            <div>
+              <div style={{ fontWeight: 500 }}>{m.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', marginTop: 2 }}>
+                {m.startDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                {' → '}
+                {m.endDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+              </div>
+            </div>
+            <div style={{ height: 8, background: 'var(--pg-bg-2)', borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ height: '100%', background: 'var(--pg-accent)', borderRadius: 999, width: `${Math.min(100, (m.durationDays / 42) * 100)}%` }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input type="number" min={1} max={180} value={m.durationDays}
+                onChange={e => onChange(calcRoadmapDates(roadmap, i, Math.max(1, Number(e.target.value))))}
+                style={{ width: 54, padding: '4px 8px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13, textAlign: 'center' }} />
+              <span style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>days</span>
+            </div>
+            <div>
+              <input type="text" value={m.notes} placeholder="Add note…"
+                onChange={e => onChange(roadmap.map((x, j) => j === i ? { ...x, notes: e.target.value } : x))}
+                style={{ width: '100%', padding: '4px 8px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 12 }} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

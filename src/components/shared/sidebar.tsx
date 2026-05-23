@@ -6,11 +6,12 @@ interface SidebarProps {
 }
 
 const items = [
-  { id: 'dashboard', icon: 'home' as const, label: 'Today', href: '/' },
+  { id: 'dashboard', icon: 'home' as const, label: 'Today', href: '/dashboard' },
   { id: 'briefs', icon: 'users' as const, label: 'Briefs', href: '/briefs' },
   { id: 'properties', icon: 'building' as const, label: 'Properties', href: '/properties' },
-  { id: 'deals', icon: 'pipeline' as const, label: 'Pipeline', count: 14, href: '/pipeline' },
-  { id: 'suggestions', icon: 'inbox' as const, label: 'Suggestions', count: 3, href: '/suggestions' },
+  { id: 'pipeline', icon: 'pipeline' as const, label: 'Pipeline', href: '/pipeline' },
+  { id: 'off-market', icon: 'shield' as const, label: 'Off-Market', href: '/off-market' },
+  { id: 'suggestions', icon: 'inbox' as const, label: 'Match Feed', count: 3, href: '/suggestions' },
   { id: 'docs', icon: 'folder' as const, label: 'Documents', href: '/docs' },
   { id: 'reports', icon: 'chart' as const, label: 'Reports', href: '/reports' },
 ];

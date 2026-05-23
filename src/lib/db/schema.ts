@@ -165,6 +165,112 @@ export const shortlistsTable = pgTable("shortlists", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
+// ── Deals ─────────────────────────────────────────────────────────────────────
+export const dealsTable = pgTable("deals", {
+  id: serial("id").primaryKey(),
+  briefId: integer("brief_id").references(() => buyerBriefsTable.id),
+  propertyId: text("property_id").references(() => propertiesTable.id),
+  status: text("status").default("suggested"),
+  offerSubState: text("offer_sub_state"),
+  offerAmount: integer("offer_amount"),
+  offerConditions: jsonb("offer_conditions").$type<string[]>().default([]),
+  settlementDate: timestamp("settlement_date", { withTimezone: true }),
+  exchangeDate: timestamp("exchange_date", { withTimezone: true }),
+  isAuction: boolean("is_auction").default(false),
+  priority: text("priority").default("standard"),
+  listingAgentName: text("listing_agent_name"),
+  listingAgentPhone: text("listing_agent_phone"),
+  listingAgentEmail: text("listing_agent_email"),
+  strategyNotes: text("strategy_notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const dealChecklistItemsTable = pgTable("deal_checklist_items", {
+  id: serial("id").primaryKey(),
+  dealId: integer("deal_id").references(() => dealsTable.id),
+  title: text("title").notNull(),
+  assignee: text("assignee"),
+  dayOffset: integer("day_offset"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  status: text("status").default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const dealMilestonesTable = pgTable("deal_milestones", {
+  id: serial("id").primaryKey(),
+  dealId: integer("deal_id").references(() => dealsTable.id),
+  title: text("title").notNull(),
+  dayOffset: integer("day_offset"),
+  dueDate: timestamp("due_date", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  status: text("status").default("pending"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const dealContactsTable = pgTable("deal_contacts", {
+  id: serial("id").primaryKey(),
+  dealId: integer("deal_id").references(() => dealsTable.id),
+  role: text("role").notNull(),
+  name: text("name"),
+  company: text("company"),
+  phone: text("phone"),
+  email: text("email"),
+  reference: text("reference"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const dealDocumentsTable = pgTable("deal_documents", {
+  id: serial("id").primaryKey(),
+  dealId: integer("deal_id").references(() => dealsTable.id),
+  filename: text("filename").notNull(),
+  tag: text("tag"),
+  fileSize: integer("file_size"),
+  uploadedBy: text("uploaded_by"),
+  clientVisible: boolean("client_visible").default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── Off-Market Hub ────────────────────────────────────────────────────────────
+export const offMarketPropertiesTable = pgTable("off_market_properties", {
+  id: serial("id").primaryKey(),
+  agentId: text("agent_id"),
+  address: text("address").notNull(),
+  suburb: text("suburb").notNull(),
+  state: text("state"),
+  propertyType: text("property_type"),
+  bedrooms: integer("bedrooms"),
+  bathrooms: integer("bathrooms"),
+  parkingSpaces: integer("parking_spaces"),
+  landSize: integer("land_size"),
+  priceMin: integer("price_min"),
+  priceMax: integer("price_max"),
+  sourceType: text("source_type").default("other"),
+  sellingAgentName: text("selling_agent_name"),
+  sellingAgentPhone: text("selling_agent_phone"),
+  sellingAgentEmail: text("selling_agent_email"),
+  howSourced: text("how_sourced"),
+  accessStatus: text("access_status").default("not_inspected"),
+  vendorMotivation: text("vendor_motivation").default("unknown"),
+  expectedListingDate: timestamp("expected_listing_date", { withTimezone: true }),
+  internalNotes: text("internal_notes"),
+  confidential: boolean("confidential").default(false),
+  lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── Beta signups ──────────────────────────────────────────────────────────────
+export const betaSignupsTable = pgTable("beta_signups", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
 // ── User Actions ──────────────────────────────────────────────────────────────
 export const userActionsTable = pgTable("user_actions", {
   id: serial("id").primaryKey(),
@@ -190,4 +296,29 @@ export const shortlistsRelations = relations(shortlistsTable, ({ one }) => ({
     fields: [shortlistsTable.propertyId],
     references: [propertiesTable.id],
   }),
+}));
+
+export const dealsRelations = relations(dealsTable, ({ one, many }) => ({
+  brief: one(buyerBriefsTable, { fields: [dealsTable.briefId], references: [buyerBriefsTable.id] }),
+  property: one(propertiesTable, { fields: [dealsTable.propertyId], references: [propertiesTable.id] }),
+  checklistItems: many(dealChecklistItemsTable),
+  milestones: many(dealMilestonesTable),
+  contacts: many(dealContactsTable),
+  documents: many(dealDocumentsTable),
+}));
+
+export const dealChecklistItemsRelations = relations(dealChecklistItemsTable, ({ one }) => ({
+  deal: one(dealsTable, { fields: [dealChecklistItemsTable.dealId], references: [dealsTable.id] }),
+}));
+
+export const dealMilestonesRelations = relations(dealMilestonesTable, ({ one }) => ({
+  deal: one(dealsTable, { fields: [dealMilestonesTable.dealId], references: [dealsTable.id] }),
+}));
+
+export const dealContactsRelations = relations(dealContactsTable, ({ one }) => ({
+  deal: one(dealsTable, { fields: [dealContactsTable.dealId], references: [dealsTable.id] }),
+}));
+
+export const dealDocumentsRelations = relations(dealDocumentsTable, ({ one }) => ({
+  deal: one(dealsTable, { fields: [dealDocumentsTable.dealId], references: [dealsTable.id] }),
 }));
