@@ -29,17 +29,25 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/signup");
-  const isProtected = pathname === "/" || pathname.startsWith("/properties") || pathname.startsWith("/pipeline") || pathname.startsWith("/portal") || pathname.startsWith("/clients");
+  const isProtected =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/briefs") ||
+    pathname.startsWith("/properties") ||
+    pathname.startsWith("/pipeline") ||
+    pathname.startsWith("/off-market") ||
+    pathname.startsWith("/deals") ||
+    pathname.startsWith("/portal");
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 

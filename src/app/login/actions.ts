@@ -5,6 +5,15 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 
+function landingRedirect(error: string) {
+  redirect(`/?error=${encodeURIComponent(error)}`);
+}
+
+function dashboardRedirect() {
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
 export async function login(formData: FormData) {
   const supabase = await createClient();
 
@@ -14,27 +23,57 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
+    const returnTo = String(formData.get("returnTo") ?? "");
+    if (returnTo === "/") {
+      landingRedirect(error.message);
+    }
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
 
+  const next = String(formData.get("next") ?? "");
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
 }
 
 export async function signup(formData: FormData) {
   const supabase = await createClient();
+  const email = String(formData.get("email"));
+  const password = String(formData.get("password"));
+  const name = String(formData.get("name") ?? "").trim();
 
-  const { error } = await supabase.auth.signUp({
-    email: String(formData.get("email")),
-    password: String(formData.get("password")),
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: name ? { data: { full_name: name } } : undefined,
   });
 
   if (error) {
+    const returnTo = String(formData.get("returnTo") ?? "");
+    if (returnTo === "/") {
+      landingRedirect(error.message);
+    }
     redirect(`/signup?error=${encodeURIComponent(error.message)}`);
   }
 
-  revalidatePath("/", "layout");
-  redirect("/login?message=Check your email to confirm your account.");
+  if (data.session) {
+    dashboardRedirect();
+  }
+
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (signInError) {
+    redirect("/login?message=Account created. Sign in to continue.");
+  }
+
+  dashboardRedirect();
+}
+
+export async function demoSignup(formData: FormData) {
+  formData.set("returnTo", "/");
+  await signup(formData);
 }
 
 export async function signOut() {

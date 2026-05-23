@@ -19,6 +19,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
       </div>
 
       <form action={login} className="flex flex-col gap-3">
+        <input type="hidden" name="next" value="/dashboard" />
         <label className="flex flex-col gap-1 text-sm">
           Email
           <input
