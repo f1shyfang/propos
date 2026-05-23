@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 
 interface MapPin {
   id: string;
@@ -43,11 +42,11 @@ export function PropertyMap({ pins, defaultCenter }: {
       center={defaultCenter}
       zoom={13}
       style={{ width: '100%', height: '100%' }}
-      zoomControl={false}
+      zoomControl={true}
     >
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> &copy; <a href="https://carto.com">CARTO</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
         maxZoom={19}
       />
       <FitBounds pins={pins} />

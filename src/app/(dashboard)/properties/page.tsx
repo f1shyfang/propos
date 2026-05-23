@@ -52,17 +52,25 @@ export default async function PropertiesPage({
 
   const mapPins = properties
     .filter(p => p.latitude && p.longitude)
-    .map((p, i) => ({
+    .map((p, i) => {
+      // Most records have lat/lng swapped in the DB — detect and correct
+      const rawLat = p.latitude!;
+      const rawLng = p.longitude!;
+      const isSwapped = rawLat > 0 && rawLng < 0; // longitude stored in lat column
+      const lat = isSwapped ? rawLng : rawLat;
+      const lng = isSwapped ? rawLat : rawLng;
+      return {
       id: p.id,
-      lat: p.latitude!,
-      lng: p.longitude!,
+      lat,
+      lng,
       address: p.address ?? '—',
       suburb: p.suburb ?? '—',
       price: formatPrice(p.price, p.priceDisplay),
       score: scoreToMatchPct(p.overallScore),
       underOffer: !!p.underOffer,
       href: `/properties/${p.id}`,
-    }));
+      };
+    });
 
   // Default center: Melbourne CBD, or average of results
   const defaultCenter: [number, number] = mapPins.length
