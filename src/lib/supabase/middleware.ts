@@ -29,7 +29,14 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/signup");
-  const isProtected = pathname === "/" || pathname.startsWith("/properties") || pathname.startsWith("/pipeline") || pathname.startsWith("/portal") || pathname.startsWith("/clients");
+  const isProtected =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/briefs") ||
+    pathname.startsWith("/properties") ||
+    pathname.startsWith("/pipeline") ||
+    pathname.startsWith("/deals") ||
+    pathname.startsWith("/portal") ||
+    pathname.startsWith("/clients");
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
@@ -39,7 +46,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
