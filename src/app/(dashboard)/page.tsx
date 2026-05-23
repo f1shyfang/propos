@@ -1,48 +1,18 @@
 import { db } from '@/lib/db';
 import { propertiesTable } from '@/lib/db/schema';
-import { desc, count, sql } from 'drizzle-orm';
+import { count } from 'drizzle-orm';
 import { TopBar } from '@/components/shared/top-bar';
 import { Icon } from '@/components/shared/icon';
 import { Sparkline } from '@/components/shared/sparkline';
-import { PropertyThumb } from '@/components/shared/property-thumb';
-import { MatchScore } from '@/components/shared/match-score';
+import { DashboardFeedback } from '@/components/shared/dashboard-feedback';
 
-function scoreToMatchPct(overall: number | null): number {
-  if (!overall) return 50;
-  return Math.min(99, Math.max(1, Math.round(overall / 100)));
-}
-
-function formatPrice(price: number | null, display: string | null): string {
-  if (display) return display;
-  if (!price) return '—';
-  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(2)}M`;
-  return `$${(price / 1000).toFixed(0)}K`;
-}
 
 export default async function DashboardPage() {
-  const [propCount, topProperties] = await Promise.all([
+  const [propCount] = await Promise.all([
     db.select({ n: count() }).from(propertiesTable),
-    db.select().from(propertiesTable)
-      .where(sql`${propertiesTable.price} > 0`)
-      .orderBy(desc(propertiesTable.overallScore))
-      .limit(4),
   ]);
 
   const totalProps = Number(propCount[0]?.n ?? 0);
-
-  const feedbackRows = topProperties.map((p, i) => ({
-    addr: p.address ?? '—',
-    sub: `${p.suburb ?? ''}, ${p.state ?? ''}`,
-    client: ['Sarah & Tom Chen', 'Priya Anand', 'The Holloways', 'Marcus Webb'][i],
-    initials: ['SC', 'PA', 'HH', 'MW'][i],
-    score: scoreToMatchPct(p.overallScore),
-    price: formatPrice(p.price, p.priceDisplay),
-    status: ['Interested', 'Need more info', 'Split decision', 'New'][i],
-    statusClass: ['pg-badge-green', 'pg-badge-amber', 'pg-badge-purple', ''][i],
-    shared: ['2h ago', '5h ago', '1d ago', '8h ago'][i],
-    seed: i,
-    id: p.id,
-  }));
 
   return (
     <div style={{ padding: 0 }}>
@@ -161,56 +131,8 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* Awaiting client feedback */}
-        <section>
-          <SectionHead
-            title="Awaiting client feedback"
-            sub={`${feedbackRows.length} properties shared · 2 still waiting`}
-            action={<button className="pg-btn pg-btn-sm pg-btn-ghost" style={{ color: 'var(--pg-text-dim)' }}>Nudge all <Icon name="arrow-right" size={11} /></button>}
-          />
-          <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
-            <div style={{
-              display: 'grid', gridTemplateColumns: '2.2fr 1.6fr 0.8fr 1fr 1fr 0.6fr',
-              padding: '10px 16px',
-              borderBottom: '1px solid var(--pg-border)',
-              fontSize: 10.5, color: 'var(--pg-text-faint)', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500,
-            }}>
-              <span>Property</span>
-              <span>Client</span>
-              <span>Match</span>
-              <span style={{ textAlign: 'right' }}>Price</span>
-              <span>Status</span>
-              <span style={{ textAlign: 'right' }}>Shared</span>
-            </div>
-            {feedbackRows.map((r, i, a) => (
-              <a key={r.id} href={`/properties/${r.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div className="pg-row" style={{
-                  display: 'grid', gridTemplateColumns: '2.2fr 1.6fr 0.8fr 1fr 1fr 0.6fr',
-                  padding: '12px 16px',
-                  alignItems: 'center',
-                  borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
-                  fontSize: 13,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                    <PropertyThumb seed={r.seed} height={36} style={{ width: 56, flexShrink: 0, borderRadius: 5 }} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 500 }} className="pg-truncate">{r.addr}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>{r.sub}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-                    <div className="pg-avatar pg-avatar-sm">{r.initials}</div>
-                    <span className="pg-truncate">{r.client}</span>
-                  </div>
-                  <div><MatchScore score={r.score} size={28} stroke={2.5} /></div>
-                  <div style={{ textAlign: 'right', fontFamily: 'var(--pg-font-mono)' }}>{r.price}</div>
-                  <div><span className={`pg-badge ${r.statusClass}`} style={{ fontSize: 11 }}>{r.status}</span></div>
-                  <div style={{ textAlign: 'right', color: 'var(--pg-text-faint)', fontSize: 12 }}>{r.shared}</div>
-                </div>
-              </a>
-            ))}
-          </div>
-        </section>
+        {/* Awaiting client feedback — live polling */}
+        <DashboardFeedback />
       </div>
     </div>
   );

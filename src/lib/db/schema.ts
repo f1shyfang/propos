@@ -1,4 +1,4 @@
-import { boolean, integer, pgTable, real, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, real, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ── LGAs ─────────────────────────────────────────────────────────────────────
@@ -110,7 +110,7 @@ export const schoolsRelations = relations(schoolsTable, ({ one }) => ({
   }),
 }));
 
-export const propertiesRelations = relations(propertiesTable, ({ one }) => ({
+export const propertiesRelations = relations(propertiesTable, ({ one, many }) => ({
   lga: one(lgasTable, {
     fields: [propertiesTable.lgaId],
     references: [lgasTable.lgaId],
@@ -118,5 +118,76 @@ export const propertiesRelations = relations(propertiesTable, ({ one }) => ({
   suburb: one(suburbsTable, {
     fields: [propertiesTable.suburbId],
     references: [suburbsTable.suburbId],
+  }),
+  shortlists: many(shortlistsTable),
+}));
+
+// ── Buyer Briefs ──────────────────────────────────────────────────────────────
+export const buyerBriefsTable = pgTable("buyer_briefs", {
+  id: serial("id").primaryKey(),
+  agentId: text("agent_id"),
+  clientName: text("client_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  contactMethod: text("contact_method").default("email"),
+  engagementType: text("engagement_type").default("full-service"),
+  preApprovalStatus: text("pre_approval_status").default("Not Started"),
+  budgetMin: integer("budget_min"),
+  budgetMax: integer("budget_max"),
+  buyerType: text("buyer_type").default("owner-occupier"),
+  propertyTypes: jsonb("property_types").$type<string[]>().default([]),
+  minBeds: integer("min_beds").default(1),
+  minBaths: integer("min_baths").default(1),
+  parking: text("parking").default("nice_to_have"),
+  suburbs: jsonb("suburbs").$type<string[]>().default([]),
+  mustHaves: jsonb("must_haves").$type<string[]>().default([]),
+  dealBreakers: jsonb("deal_breakers").$type<string[]>().default([]),
+  urgency: text("urgency").default("3 months"),
+  purchasePurpose: text("purchase_purpose").default("PPOR"),
+  auctionWillingness: boolean("auction_willingness").default(true),
+  status: text("status").default("searching"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── Shortlists ────────────────────────────────────────────────────────────────
+export const shortlistsTable = pgTable("shortlists", {
+  id: serial("id").primaryKey(),
+  briefId: integer("brief_id").references(() => buyerBriefsTable.id),
+  propertyId: text("property_id").references(() => propertiesTable.id),
+  agentNote: text("agent_note"),
+  status: text("status").default("shortlisted"),
+  feedbackStatus: text("feedback_status").default("new"),
+  feedbackText: text("feedback_text"),
+  feedbackReason: text("feedback_reason"),
+  sharedAt: timestamp("shared_at", { withTimezone: true }),
+  feedbackAt: timestamp("feedback_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── User Actions ──────────────────────────────────────────────────────────────
+export const userActionsTable = pgTable("user_actions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  actionType: text("action_type").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── Relations ─────────────────────────────────────────────────────────────────
+export const buyerBriefsRelations = relations(buyerBriefsTable, ({ many }) => ({
+  shortlists: many(shortlistsTable),
+}));
+
+export const shortlistsRelations = relations(shortlistsTable, ({ one }) => ({
+  brief: one(buyerBriefsTable, {
+    fields: [shortlistsTable.briefId],
+    references: [buyerBriefsTable.id],
+  }),
+  property: one(propertiesTable, {
+    fields: [shortlistsTable.propertyId],
+    references: [propertiesTable.id],
   }),
 }));

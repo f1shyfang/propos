@@ -7,7 +7,7 @@ interface SidebarProps {
 
 const items = [
   { id: 'dashboard', icon: 'home' as const, label: 'Today', href: '/' },
-  { id: 'clients', icon: 'users' as const, label: 'Clients', count: 23, href: '/clients' },
+  { id: 'briefs', icon: 'users' as const, label: 'Briefs', href: '/briefs' },
   { id: 'properties', icon: 'building' as const, label: 'Properties', href: '/properties' },
   { id: 'deals', icon: 'pipeline' as const, label: 'Pipeline', count: 14, href: '/pipeline' },
   { id: 'suggestions', icon: 'inbox' as const, label: 'Suggestions', count: 3, href: '/suggestions' },
