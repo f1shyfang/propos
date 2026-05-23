@@ -7,7 +7,7 @@ export function Logo({ size = 22 }: { size?: number }) {
         <path d="M12 7v5l3 2" stroke="#E5B100" strokeWidth="1.4" strokeLinecap="round" />
       </svg>
       <span style={{ fontFamily: 'var(--pg-font-display)', fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--pg-text)' }}>
-        Propertygo
+        Propos
       </span>
     </div>
   );

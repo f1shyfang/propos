@@ -168,7 +168,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             <div style={{ background: 'var(--pg-accent-soft)', border: '1px solid rgba(229,177,0,0.25)', borderRadius: 10, padding: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <Icon name="sparkles" size={14} color="var(--pg-accent)" />
-                <span style={{ fontSize: 12, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#806000' }}>PropertyGo Score Breakdown</span>
+                <span style={{ fontSize: 12, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#806000' }}>Propos Score Breakdown</span>
                 <div style={{ flex: 1 }} />
                 <MatchScore score={matchScore} size={32} stroke={3} />
               </div>

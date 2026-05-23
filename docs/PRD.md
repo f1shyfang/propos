@@ -1,4 +1,4 @@
-# Product Requirements Document — BuyersAgent MVP
+# Product Requirements Document — Propos MVP
 
 **Hackathon:** 48-hour build | **Team:** 3 full-stack developers | **Market:** Australia
 

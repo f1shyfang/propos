@@ -1,4 +1,4 @@
-# PropertyGo — Design notes
+# Propos — Design notes
 
 A buyer's-agent terminal for the Australian property market. Five screens, one canvas.
 
@@ -90,7 +90,7 @@ Different chrome — agency logo top-left, simple tabs, no agent sidebar. Single
 ## File layout
 
 ```
-PropertyGo.html              — entry, uses design_canvas to host all artboards
+Propos design canvas           — entry, uses design_canvas to host all artboards
 styles.css                   — tokens + base styles
 components/shared.jsx        — Icon, Logo, Sidebar, TopBar, Sparkline, PropertyThumb, MatchScore
 screens/

@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "hack48-ndis",
+      "name": "propos",
       "dependencies": {
         "@supabase/ssr": "^0.10.3",
         "@supabase/supabase-js": "^2.106.1",
