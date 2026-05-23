@@ -1,8 +1,12 @@
+'use client';
+
 import { Icon } from './icon';
 import { Logo } from './logo';
+import type { UserDisplay } from '@/lib/user-display';
 
 interface SidebarProps {
   active?: string;
+  user?: UserDisplay;
 }
 
 const items = [
@@ -11,12 +15,19 @@ const items = [
   { id: 'properties', icon: 'building' as const, label: 'Properties', href: '/properties' },
   { id: 'pipeline', icon: 'pipeline' as const, label: 'Pipeline', href: '/pipeline' },
   { id: 'off-market', icon: 'shield' as const, label: 'Off-Market', href: '/off-market' },
-  { id: 'suggestions', icon: 'inbox' as const, label: 'Match Feed', count: 3, href: '/suggestions' },
+  { id: 'suggestions', icon: 'inbox' as const, label: 'Match Feed', href: '/suggestions' },
   { id: 'docs', icon: 'folder' as const, label: 'Documents', href: '/docs' },
-  { id: 'reports', icon: 'chart' as const, label: 'Reports', href: '/reports' },
 ];
 
-export function Sidebar({ active = 'dashboard' }: SidebarProps) {
+export function Sidebar({ active = 'dashboard', user }: SidebarProps) {
+  const displayName = user?.name ?? 'Agent';
+  const displayOrg = user?.org ?? "Buyer's agency";
+  const initials = user?.initials ?? displayName.slice(0, 2).toUpperCase();
+
+  function openQuickFind() {
+    window.dispatchEvent(new CustomEvent('quick-find:open'));
+  }
+
   return (
     <aside style={{
       width: 220,
@@ -32,19 +43,22 @@ export function Sidebar({ active = 'dashboard' }: SidebarProps) {
         <Logo />
       </div>
 
-      <button style={{
-        display: 'flex', alignItems: 'center', gap: 9,
-        padding: '8px 10px',
-        background: 'transparent',
-        border: '1px solid var(--pg-border)',
-        borderRadius: 8,
-        marginBottom: 16,
-        cursor: 'text',
-        color: 'var(--pg-text-faint)',
-        fontSize: 12.5,
-        fontFamily: 'var(--pg-font-body)',
-        width: '100%',
-      }}>
+      <button
+        onClick={openQuickFind}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 9,
+          padding: '8px 10px',
+          background: 'transparent',
+          border: '1px solid var(--pg-border)',
+          borderRadius: 8,
+          marginBottom: 16,
+          cursor: 'pointer',
+          color: 'var(--pg-text-faint)',
+          fontSize: 12.5,
+          fontFamily: 'var(--pg-font-body)',
+          width: '100%',
+        }}
+      >
         <Icon name="search" size={13} color="currentColor" />
         <span>Quick find</span>
         <span style={{ marginLeft: 'auto', fontFamily: 'var(--pg-font-mono)', fontSize: 10.5, padding: '0 5px', border: '1px solid var(--pg-border)', borderRadius: 3 }}>⌘K</span>
@@ -65,39 +79,34 @@ export function Sidebar({ active = 'dashboard' }: SidebarProps) {
           }}>
             <Icon name={item.icon} size={15} color="currentColor" strokeWidth={active === item.id ? 1.8 : 1.5} />
             <span>{item.label}</span>
-            {item.count != null && (
-              <span style={{
-                marginLeft: 'auto',
-                fontSize: 10.5,
-                fontFamily: 'var(--pg-font-mono)',
-                color: 'var(--pg-text-faint)',
-              }}>{item.count}</span>
-            )}
           </a>
         ))}
       </nav>
 
       <div style={{ flex: 1 }} />
 
-      <div style={{ padding: 12, background: 'var(--pg-bg-2)', borderRadius: 8, marginBottom: 14 }}>
-        <div className="pg-label" style={{ fontSize: 9.5, marginBottom: 4 }}>Settling Today</div>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>22 Oak Ave, Kew</div>
-        <div style={{ fontSize: 11, color: 'var(--pg-text-dim)', marginTop: 2 }}>Cho · $1.62M · 2pm</div>
-      </div>
-
+      {/* Bottom user section */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 9,
         paddingTop: 14,
         borderTop: '1px solid var(--pg-border)',
       }}>
-        <div className="pg-avatar" style={{ background: '#1A1814', color: '#FAFAF7', borderColor: '#1A1814' }}>JM</div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 500 }}>Jess Morgan</div>
-          <div style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>Bayside Buyer&apos;s</div>
+        <div className="pg-avatar" style={{ background: '#1A1814', color: '#FAFAF7', borderColor: '#1A1814', flexShrink: 0 }}>
+          {initials}
         </div>
-        <button className="pg-btn pg-btn-ghost pg-btn-icon pg-btn-sm" style={{ color: 'var(--pg-text-faint)' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
+          <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayOrg}</div>
+        </div>
+        <a
+          href="/account"
+          title="Account settings"
+          style={{ color: 'var(--pg-text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, borderRadius: 4, textDecoration: 'none', flexShrink: 0 }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--pg-text)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--pg-text-faint)')}
+        >
           <Icon name="settings" size={14} />
-        </button>
+        </a>
       </div>
     </aside>
   );
