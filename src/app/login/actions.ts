@@ -18,7 +18,7 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect("/protected");
+  redirect("/");
 }
 
 export async function signup(formData: FormData) {
