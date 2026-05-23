@@ -36,6 +36,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/pipeline") ||
     pathname.startsWith("/off-market") ||
     pathname.startsWith("/deals") ||
+    pathname.startsWith("/account") ||
+    pathname.startsWith("/settings") ||
     pathname.startsWith("/portal");
 
   if (!user && isProtected) {
