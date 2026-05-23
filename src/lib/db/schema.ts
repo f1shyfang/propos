@@ -80,6 +80,8 @@ export const propertiesTable = pgTable("properties", {
   privateRenters: integer("private_renters"),
   ooPerc: real("oo_perc"),
   underOffer: integer("under_offer"),
+  suburbCode: text("suburb_code"),
+  images: jsonb("images").$type<string[]>().default([]),
 });
 
 // ── Relations ─────────────────────────────────────────────────────────────────

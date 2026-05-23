@@ -70,10 +70,10 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
         <div>
           {/* Gallery */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 6, height: 360 }}>
-            <PropertyThumb seed={0} height={360} style={{ gridRow: '1 / span 2', borderRadius: 10 }} />
-            <PropertyThumb seed={2} height={177} style={{ borderRadius: 10 }} />
-            <PropertyThumb seed={1} height={177} style={{ borderRadius: 10 }} />
-            <PropertyThumb seed={3} height={177} style={{ borderRadius: 10 }} />
+            <PropertyThumb seed={0} height={360} imageUrl={p.images?.[0]} style={{ gridRow: '1 / span 2', borderRadius: 10 }} />
+            <PropertyThumb seed={2} height={177} imageUrl={p.images?.[1]} style={{ borderRadius: 10 }} />
+            <PropertyThumb seed={1} height={177} imageUrl={p.images?.[2]} style={{ borderRadius: 10 }} />
+            <PropertyThumb seed={3} height={177} imageUrl={p.images?.[3]} style={{ borderRadius: 10 }} />
             <div style={{
               borderRadius: 10,
               background: 'var(--pg-bg-2)',
@@ -83,7 +83,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               color: 'var(--pg-text-dim)', cursor: 'pointer',
             }}>
               <Icon name="image" size={20} />
-              <span style={{ fontSize: 12 }}>+ more</span>
+              <span style={{ fontSize: 12 }}>{p.images && p.images.length > 4 ? `+${p.images.length - 4} more` : '+ more'}</span>
             </div>
           </div>
 

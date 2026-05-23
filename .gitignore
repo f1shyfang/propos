@@ -42,3 +42,4 @@ next-env.d.ts
 
 # large data files
 data/properties copy_coords.jsonl
+data/property_images.jsonl

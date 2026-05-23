@@ -24,6 +24,7 @@ export interface PropertyPin {
   parkingSpaces?: number | null;
   propertyType?: string | null;
   days?: number | null;
+  imageUrl?: string | null;
 }
 
 function MatchRing({ score }: { score: number }) {
@@ -180,8 +181,11 @@ export function PropertiesView({ initialPins, defaultCenter }: {
                 borderLeft: activePin === p.id || i === 0 ? '2px solid var(--pg-accent)' : '2px solid transparent',
                 transition: 'background 80ms',
               }}>
-                <div style={{ width: 100, flexShrink: 0, borderRadius: 6, background: `hsl(${(i * 47) % 360}deg 20% 88%)`, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.3)', fontWeight: 500, textTransform: 'capitalize' }}>{p.propertyType ?? 'Property'}</span>
+                <div style={{ width: 100, flexShrink: 0, borderRadius: 6, overflow: 'hidden', height: 72, background: `hsl(${(i * 47) % 360}deg 20% 88%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {p.imageUrl
+                    ? <img src={p.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.3)', fontWeight: 500, textTransform: 'capitalize' }}>{p.propertyType ?? 'Property'}</span>
+                  }
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>

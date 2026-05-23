@@ -48,6 +48,7 @@ export default async function PropertiesPage() {
         parkingSpaces: p.parkingSpaces,
         propertyType: p.propertyType,
         days: p.days,
+        imageUrl: p.images?.[0] ?? null,
       };
     });
 

@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     SELECT
       id, address, suburb, state, property_type,
       bedrooms, bathrooms, parking_spaces,
-      price, price_display, overall_score, under_offer, days,
+      price, price_display, overall_score, under_offer, days, images,
       CASE WHEN latitude BETWEEN -45 AND -10 THEN latitude ELSE longitude END AS true_lat,
       CASE WHEN latitude BETWEEN -45 AND -10 THEN longitude ELSE latitude END AS true_lng
     FROM properties
@@ -76,6 +76,7 @@ export async function GET(req: NextRequest) {
     parkingSpaces: p.parking_spaces as number | null,
     propertyType: p.property_type as string | null,
     days: p.days as number | null,
+    imageUrl: (p.images as string[] | null)?.[0] ?? null,
   }));
 
   return NextResponse.json({ pins, count: pins.length });

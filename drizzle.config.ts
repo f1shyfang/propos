@@ -8,4 +8,5 @@ export default defineConfig({
   dbCredentials: {
     url: "postgresql://postgres.mtsdxlrihqzizoeaofjb:b3PeHUhBFh8zSEV0@aws-1-ap-south-1.pooler.supabase.com:6543/postgres",
   },
+  extensionsFilters: ["postgis"],
 });
