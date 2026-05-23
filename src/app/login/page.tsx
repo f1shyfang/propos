@@ -4,11 +4,7 @@ import { login } from "./actions";
 
 type SearchParams = Promise<{ error?: string; message?: string }>;
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   const { error, message } = await searchParams;
 
   return (
@@ -43,10 +39,7 @@ export default async function LoginPage({
         {message ? <p className="text-sm text-green-600">{message}</p> : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-        <button
-          type="submit"
-          className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800"
-        >
+        <button type="submit" className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800">
           Sign in
         </button>
       </form>
