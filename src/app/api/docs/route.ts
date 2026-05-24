@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
       fileSize: dealDocumentsTable.fileSize,
       uploadedBy: dealDocumentsTable.uploadedBy,
       clientVisible: dealDocumentsTable.clientVisible,
+      status: dealDocumentsTable.status,
       createdAt: dealDocumentsTable.createdAt,
       dealStatus: dealsTable.status,
       propertyAddress: propertiesTable.address,

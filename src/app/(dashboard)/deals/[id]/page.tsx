@@ -6,6 +6,8 @@ import { Icon } from '@/components/shared/icon';
 import { MatchScore } from '@/components/shared/match-score';
 import { getDealStatusLabel, getOfferSubStateLabel, DEAL_STATUSES, calcCoolingOffStatus } from '@/lib/deal-utils';
 import { calcStampDuty } from '@/lib/settlement-utils';
+import { DealDocumentPanel } from '@/components/deals/deal-document-panel';
+import { DealDocumentActions, type DealDocumentRow } from '@/components/deals/deal-document-actions';
 
 type Tab = 'overview' | 'due_diligence' | 'cma' | 'offer' | 'settlement' | 'contacts' | 'documents';
 
@@ -26,7 +28,7 @@ interface Deal {
 interface ChecklistItem { id: number; title: string; assignee: string | null; dayOffset: number | null; completedAt: string | null; status: string; }
 interface Milestone { id: number; title: string; dayOffset: number | null; dueDate: string | null; completedAt: string | null; status: string; notes: string | null; }
 interface Contact { id: number; role: string; name: string | null; company: string | null; phone: string | null; email: string | null; reference: string | null; notes: string | null; }
-interface Document { id: number; filename: string; tag: string | null; fileSize: number | null; uploadedBy: string | null; clientVisible: boolean; createdAt: string; }
+type Document = DealDocumentRow & { uploadedBy: string | null };
 interface CMAComp { id: string; address: string; price: number | null; priceDisplay: string | null; bedrooms: number | null; bathrooms: number | null; landSize: number | null; comparabilityScore: number; }
 
 function fmt(n: number | null): string {
@@ -260,7 +262,13 @@ export default function DealDetailPage() {
         {/* DUE DILIGENCE TAB */}
         {tab === 'due_diligence' && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <DealDocumentActions
+              dealId={id}
+              documents={documents}
+              defaultTag="Building Inspection"
+              onRefresh={load}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, marginTop: 20 }}>
               <div>
                 <div style={{ fontSize: 13, color: 'var(--pg-text-dim)' }}>
                   {checklist.filter(i => i.status === 'completed').length} / {checklist.length} complete
@@ -290,12 +298,37 @@ export default function DealDetailPage() {
                       {item.completedAt && ` · Completed ${new Date(item.completedAt).toLocaleDateString('en-AU')}`}
                     </div>
                   </div>
-                  <span className={`pg-badge ${item.status === 'completed' ? 'pg-badge-green' : item.status === 'overdue' ? 'pg-badge-red' : ''}`} style={{ fontSize: 10, flexShrink: 0 }}>
-                    {item.status}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
+                    <span className={`pg-badge ${item.status === 'completed' ? 'pg-badge-green' : item.status === 'overdue' ? 'pg-badge-red' : ''}`} style={{ fontSize: 10 }}>
+                      {item.status}
+                    </span>
+                    <DealDocumentActions
+                      dealId={id}
+                      documents={documents}
+                      checklistItemId={item.id}
+                      compact
+                      onRefresh={load}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
+            <DealDocumentPanel
+              dealId={id}
+              documents={documents}
+              onRefresh={load}
+              title="Due diligence files"
+              defaultTag="Building Inspection"
+              tagFilter={[
+                'Section 32 / Vendor Statement',
+                'Strata Report',
+                'Building Inspection',
+                'Pest Inspection',
+                'Contract of Sale',
+                'Other',
+              ]}
+              allowGenerate={null}
+            />
           </div>
         )}
 
@@ -306,7 +339,8 @@ export default function DealDetailPage() {
               <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--pg-text-dim)' }}>Loading comparable sales…</div>
             ) : (
               <>
-                <div style={{ marginBottom: 20, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                <DealDocumentActions dealId={id} documents={documents} defaultTag="CMA Report" showGenerateCma onRefresh={load} />
+                <div style={{ marginBottom: 20, marginTop: 16, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
                   <div className="pg-card" style={{ padding: '16px 20px', minWidth: 200 }}>
                     <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', marginBottom: 4 }}>Estimated value range</div>
                     <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--pg-font-display)' }}>
@@ -335,17 +369,37 @@ export default function DealDetailPage() {
                 </div>
               </>
             )}
+            <DealDocumentPanel
+              dealId={id}
+              documents={documents}
+              onRefresh={load}
+              title="CMA reports"
+              defaultTag="CMA Report"
+              tagFilter={['CMA Report', 'Correspondence']}
+              allowGenerate="cma"
+            />
           </div>
         )}
 
         {/* OFFER TAB */}
         {tab === 'offer' && (
-          <OfferTab deal={deal} onSave={updateDeal} saving={saving} />
+          <OfferTab deal={deal} dealId={id} documents={documents} onSave={updateDeal} onRefresh={load} saving={saving} />
         )}
 
         {/* SETTLEMENT TAB */}
         {tab === 'settlement' && (
-          <SettlementTab deal={deal} milestones={milestones} onToggle={toggleMilestone} onSave={updateDeal} saving={saving} daysToSettlement={daysToSettlement} coolingStatus={coolingStatus} />
+          <SettlementTab
+            dealId={id}
+            deal={deal}
+            documents={documents}
+            milestones={milestones}
+            onToggle={toggleMilestone}
+            onSave={updateDeal}
+            onRefresh={load}
+            saving={saving}
+            daysToSettlement={daysToSettlement}
+            coolingStatus={coolingStatus}
+          />
         )}
 
         {/* CONTACTS TAB */}
@@ -363,7 +417,10 @@ export default function DealDetailPage() {
 }
 
 // ── Offer Tab ─────────────────────────────────────────────────────────────────
-function OfferTab({ deal, onSave, saving }: { deal: Deal; onSave: (p: Record<string, unknown>) => Promise<void>; saving: boolean }) {
+function OfferTab({ deal, dealId, documents, onSave, onRefresh, saving }: {
+  deal: Deal; dealId: string; documents: Document[];
+  onSave: (p: Record<string, unknown>) => Promise<void>; onRefresh: () => Promise<void>; saving: boolean;
+}) {
   const [amount, setAmount] = useState(String(deal.offerAmount ?? ''));
   const [subState, setSubState] = useState(deal.offerSubState ?? 'draft');
   const [conditions, setConditions] = useState<string[]>(deal.offerConditions ?? []);
@@ -428,15 +485,31 @@ function OfferTab({ deal, onSave, saving }: { deal: Deal; onSave: (p: Record<str
           {saving ? 'Saving…' : 'Save offer details'}
         </button>
       </div>
+      <div style={{ marginTop: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--pg-text-faint)', marginBottom: 10 }}>
+          Offer documents
+        </div>
+        <DealDocumentActions
+          dealId={dealId}
+          documents={documents}
+          defaultTag="Offer Letter"
+          showGenerateOffer
+          onRefresh={onRefresh}
+        />
+      </div>
     </div>
   );
 }
 
 // ── Settlement Tab ────────────────────────────────────────────────────────────
-function SettlementTab({ deal, milestones, onToggle, onSave, saving, daysToSettlement, coolingStatus }: {
-  deal: Deal; milestones: Milestone[];
+function SettlementTab({ dealId, deal, documents, milestones, onToggle, onSave, onRefresh, saving, daysToSettlement, coolingStatus }: {
+  dealId: string;
+  deal: Deal;
+  documents: Document[];
+  milestones: Milestone[];
   onToggle: (id: number, completed: boolean) => Promise<void>;
   onSave: (p: Record<string, unknown>) => Promise<void>;
+  onRefresh: () => Promise<void>;
   saving: boolean;
   daysToSettlement: number | null;
   coolingStatus: { expired: boolean; daysLeft: number } | null;
@@ -524,6 +597,15 @@ function SettlementTab({ deal, milestones, onToggle, onSave, saving, daysToSettl
           </div>
         </div>
       )}
+      <DealDocumentPanel
+        dealId={dealId}
+        documents={documents}
+        onRefresh={onRefresh}
+        title="Settlement documents"
+        defaultTag="Finance Approval"
+        tagFilter={['Finance Approval', 'Stamp Duty Receipt', 'Certificate of Title', 'Correspondence', 'Other']}
+        allowGenerate={null}
+      />
     </div>
   );
 }
@@ -590,25 +672,7 @@ function ContactsTab({ dealId, contacts, onRefresh }: { dealId: string; contacts
 }
 
 // ── Documents Tab ─────────────────────────────────────────────────────────────
-const DOC_TAGS = ['Contract of Sale', 'Section 32 / Vendor Statement', 'Strata Report', 'Building Inspection', 'Pest Inspection', 'Finance Approval', 'Stamp Duty Receipt', 'Certificate of Title', 'Correspondence', 'Other'];
-
 function DocumentsTab({ dealId, documents, onRefresh }: { dealId: string; documents: Document[]; onRefresh: () => Promise<void> }) {
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ filename: '', tag: 'Other' });
-  const [saving, setSaving] = useState(false);
-
-  async function addDocument() {
-    if (!form.filename.trim()) return;
-    setSaving(true);
-    await fetch(`/api/deals/${dealId}/documents`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
-    });
-    await onRefresh();
-    setAdding(false);
-    setForm({ filename: '', tag: 'Other' });
-    setSaving(false);
-  }
-
   async function toggleVisibility(documentId: number, clientVisible: boolean) {
     await fetch(`/api/deals/${dealId}/documents`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ documentId, clientVisible }),
@@ -618,31 +682,20 @@ function DocumentsTab({ dealId, documents, onRefresh }: { dealId: string; docume
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <button className="pg-btn" onClick={() => setAdding(true)}><Icon name="plus" size={12} />Add document</button>
-      </div>
-      {documents.length === 0 && !adding && (
-        <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--pg-text-faint)', fontSize: 13 }}>No documents yet. Add contracts, reports and correspondence.</div>
+      <DealDocumentActions dealId={dealId} documents={documents} onRefresh={onRefresh} />
+      {documents.length === 0 && (
+        <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--pg-text-faint)', fontSize: 13 }}>No documents yet. Upload contracts, reports and correspondence.</div>
       )}
-      <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
-        {adding && (
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--pg-border)', display: 'flex', gap: 10, alignItems: 'center' }}>
-            <input type="text" placeholder="Filename" value={form.filename} onChange={e => setForm(f => ({ ...f, filename: e.target.value }))}
-              style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13 }} />
-            <select value={form.tag} onChange={e => setForm(f => ({ ...f, tag: e.target.value }))}
-              style={{ padding: '7px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 12 }}>
-              {DOC_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <button className="pg-btn pg-btn-sm pg-btn-primary" onClick={addDocument} disabled={saving}>{saving ? '…' : 'Add'}</button>
-            <button className="pg-btn pg-btn-sm" onClick={() => setAdding(false)}>Cancel</button>
-          </div>
-        )}
+      <div className="pg-card-flat" style={{ overflow: 'hidden', marginTop: 16 }}>
         {documents.map((doc, i, a) => (
           <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none', fontSize: 13 }}>
             <Icon name="file-text" size={16} color="var(--pg-text-faint)" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 500 }} className="pg-truncate">{doc.filename}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--pg-text-faint)' }}>{doc.tag ?? 'Other'} · {new Date(doc.createdAt).toLocaleDateString('en-AU')}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--pg-text-faint)' }}>
+                {doc.tag ?? 'Other'} · {new Date(doc.createdAt).toLocaleDateString('en-AU')}
+                {doc.status === 'pending' ? ' · uploading' : ''}
+              </div>
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--pg-text-dim)', cursor: 'pointer' }}>
               <input type="checkbox" checked={doc.clientVisible} onChange={e => toggleVisibility(doc.id, e.target.checked)} style={{ accentColor: 'var(--pg-accent)' }} />

@@ -7,9 +7,17 @@ export const DOC_TAGS = [
   'Finance Approval',
   'Stamp Duty Receipt',
   'Certificate of Title',
+  'CMA Report',
+  'Offer Letter',
   'Correspondence',
   'Other',
 ] as const;
+
+export const DOCUMENT_SOURCES = ['upload', 'generated_offer', 'generated_cma'] as const;
+export type DocumentSource = (typeof DOCUMENT_SOURCES)[number];
+
+export const DOCUMENT_STATUSES = ['pending', 'ready', 'failed', 'legacy'] as const;
+export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
 
 export type DocTag = (typeof DOC_TAGS)[number];
 
@@ -22,9 +30,22 @@ const TAG_COLORS: Record<string, string> = {
   'Finance Approval': '#166534',
   'Stamp Duty Receipt': '#166534',
   'Certificate of Title': '#374151',
+  'CMA Report': '#1d6fa4',
+  'Offer Letter': '#6b21a8',
   Correspondence: '#374151',
   Other: '#6b7280',
 };
+
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+export function sanitizeFilename(name: string): string {
+  const base = name.replace(/[/\\]/g, '_').replace(/[^\w.\- ()]/g, '_').trim();
+  return base.slice(0, 200) || 'document';
+}
+
+export function getMaxUploadBytes(): number {
+  return MAX_UPLOAD_BYTES;
+}
 
 export function getDocTagColor(tag: string): string {
   return TAG_COLORS[tag] ?? '#6b7280';

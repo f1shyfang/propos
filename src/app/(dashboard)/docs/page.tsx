@@ -13,6 +13,7 @@ interface Doc {
   fileSize: number | null;
   uploadedBy: string | null;
   clientVisible: boolean;
+  status: string | null;
   createdAt: string;
   dealStatus: string | null;
   propertyAddress: string | null;
@@ -38,6 +39,13 @@ export default function DocsPage() {
   function handleTagChange(tag: string) {
     setSelectedTag(tag);
     load(tag);
+  }
+
+  async function downloadDoc(docId: number) {
+    const res = await fetch(`/api/docs/${docId}/download-url`);
+    if (!res.ok) return;
+    const { downloadUrl } = await res.json();
+    window.open(downloadUrl, '_blank', 'noopener,noreferrer');
   }
 
   const clientVisible = docs.filter(d => d.clientVisible);
@@ -96,11 +104,11 @@ export default function DocsPage() {
                   </div>
 
                   <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1fr 0.8fr 0.5fr', padding: '9px 16px', borderBottom: '1px solid var(--pg-border)', fontSize: 10.5, color: 'var(--pg-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>
-                      <span>Filename</span><span>Deal</span><span>Client</span><span>Added</span><span style={{ textAlign: 'right' }}>Size</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1fr 0.8fr 0.5fr 0.6fr', padding: '9px 16px', borderBottom: '1px solid var(--pg-border)', fontSize: 10.5, color: 'var(--pg-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>
+                      <span>Filename</span><span>Deal</span><span>Client</span><span>Added</span><span style={{ textAlign: 'right' }}>Size</span><span />
                     </div>
                     {list.map((doc, i, a) => (
-                      <div key={doc.id} style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1fr 0.8fr 0.5fr', padding: '12px 16px', borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none', fontSize: 13, alignItems: 'center' }}>
+                      <div key={doc.id} style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1fr 0.8fr 0.5fr 0.6fr', padding: '12px 16px', borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none', fontSize: 13, alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                           <Icon name="file-text" size={15} color="var(--pg-text-faint)" />
                           <div style={{ minWidth: 0 }}>
@@ -130,6 +138,13 @@ export default function DocsPage() {
                         </div>
                         <div style={{ fontSize: 11.5, color: 'var(--pg-text-faint)', textAlign: 'right', fontFamily: 'var(--pg-font-mono)' }}>
                           {formatFileSize(doc.fileSize)}
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          {doc.status === 'ready' && (
+                            <button type="button" className="pg-btn pg-btn-sm" onClick={() => void downloadDoc(doc.id)}>
+                              Download
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

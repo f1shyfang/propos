@@ -353,11 +353,17 @@ export const dealContactsTable = pgTable("deal_contacts", {
 export const dealDocumentsTable = pgTable("deal_documents", {
   id: serial("id").primaryKey(),
   dealId: integer("deal_id").references(() => dealsTable.id),
+  checklistItemId: integer("checklist_item_id").references(() => dealChecklistItemsTable.id),
   filename: text("filename").notNull(),
   tag: text("tag"),
+  s3Key: text("s3_key"),
+  mimeType: text("mime_type"),
+  source: text("source").default("upload"),
+  status: text("status").default("legacy"),
   fileSize: integer("file_size"),
   uploadedBy: text("uploaded_by"),
   clientVisible: boolean("client_visible").default(false),
+  generatedAt: timestamp("generated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 

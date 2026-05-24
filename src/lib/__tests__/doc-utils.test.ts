@@ -62,5 +62,7 @@ describe('DOC_TAGS', () => {
     expect(DOC_TAGS).toContain('Contract of Sale');
     expect(DOC_TAGS).toContain('Building Inspection');
     expect(DOC_TAGS).toContain('Finance Approval');
+    expect(DOC_TAGS).toContain('Offer Letter');
+    expect(DOC_TAGS).toContain('CMA Report');
   });
 });
