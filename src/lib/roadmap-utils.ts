@@ -63,3 +63,18 @@ export function calcRoadmapDates(milestones: RoadmapMilestone[], changedIndex: n
 
   return updated;
 }
+
+export function shiftRoadmapStart(milestones: RoadmapMilestone[], newStartDate: Date): RoadmapMilestone[] {
+  const updated = milestones.map(m => ({ ...m }));
+  updated[0].startDate = new Date(newStartDate);
+  updated[0].endDate = new Date(newStartDate);
+  updated[0].endDate.setDate(updated[0].endDate.getDate() + updated[0].durationDays);
+
+  for (let i = 1; i < updated.length; i++) {
+    updated[i].startDate = new Date(updated[i - 1].endDate);
+    updated[i].endDate = new Date(updated[i].startDate);
+    updated[i].endDate.setDate(updated[i].endDate.getDate() + updated[i].durationDays);
+  }
+
+  return updated;
+}
