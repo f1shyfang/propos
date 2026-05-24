@@ -188,6 +188,8 @@ function BriefDetailPage() {
   const [filter, setFilter] = useState<FilterState | null>(null);
   const [filterDraft, setFilterDraft] = useState<FilterState | null>(null);
   const [savingFilter, setSavingFilter] = useState(false);
+  const [profileSubTab, setProfileSubTab] = useState<"contact" | "buyer" | "search" | "preferences">("contact");
+  const [justSaved, setJustSaved] = useState(false);
 
   const [copied, setCopied] = useState(false);
   const [suburbSuggestions, setSuburbSuggestions] = useState<string[]>([]);
@@ -1155,236 +1157,357 @@ function BriefDetailPage() {
         )}
 
         {tab === "profile" && filterDraft && (
-          <div style={{ maxWidth: 720 }}>
-            <ProfileSection title="Contact details">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-                <ProfileField
-                  label="Full name"
-                  value={filterDraft.clientName}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, clientName: v } : d))}
-                />
-                <ProfileField
-                  label="Email"
-                  value={filterDraft.email}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, email: v } : d))}
-                />
-                <ProfileField
-                  label="Phone"
-                  value={filterDraft.phone}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, phone: v } : d))}
-                />
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 14,
-                  marginTop: 14,
-                }}
-              >
-                <ProfileSelect
-                  label="Preferred contact"
-                  value={filterDraft.contactMethod}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, contactMethod: v } : d))}
-                  options={[
-                    ["email", "Email"],
-                    ["phone", "Phone"],
-                    ["sms", "SMS"],
-                  ]}
-                />
-                <ProfileSelect
-                  label="Engagement type"
-                  value={filterDraft.engagementType}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, engagementType: v } : d))}
-                  options={[
-                    ["full-service", "Full service"],
-                    ["auction-only", "Auction only"],
-                    ["consult", "Consult only"],
-                  ]}
-                />
-                <ProfileSelect
-                  label="Brief status"
-                  value={filterDraft.status}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, status: v } : d))}
-                  options={[
-                    ["searching", "Searching"],
-                    ["under-offer", "Under offer"],
-                    ["settled", "Settled"],
-                    ["paused", "Paused"],
-                  ]}
-                />
-              </div>
-            </ProfileSection>
+          <div style={{ display: "flex", gap: 32, maxWidth: 960, width: "100%", alignItems: "flex-start", marginTop: 8 }}>
+            {/* Sidebar sub-navigation */}
+            <div style={{ width: 260, flexShrink: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              {[
+                {
+                  id: "contact" as const,
+                  label: "Contact Details",
+                  desc: "Client contact info & status",
+                  icon: "users" as const,
+                },
+                {
+                  id: "buyer" as const,
+                  label: "Buyer Background",
+                  desc: "Purpose, urgency & finance",
+                  icon: "briefcase" as const,
+                },
+                {
+                  id: "search" as const,
+                  label: "Search Criteria",
+                  desc: "Budget, beds/baths & suburbs",
+                  icon: "home" as const,
+                },
+                {
+                  id: "preferences" as const,
+                  label: "Must-Haves & Deal-Breakers",
+                  desc: "Client preferences & rules",
+                  icon: "sliders" as const,
+                },
+              ].map((t) => {
+                const isActive = profileSubTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setProfileSubTab(t.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      width: "100%",
+                      padding: "10px 14px",
+                      borderRadius: 8,
+                      border: "1px solid",
+                      borderColor: isActive ? "var(--pg-border-strong)" : "transparent",
+                      background: isActive ? "var(--pg-surface)" : "transparent",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      transition: "all 150ms ease",
+                      color: isActive ? "var(--pg-text)" : "var(--pg-text-dim)",
+                      boxShadow: isActive ? "0 1px 3px rgba(0, 0, 0, 0.02)" : "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 30,
+                        height: 30,
+                        borderRadius: 6,
+                        background: isActive ? "var(--pg-accent-soft)" : "var(--pg-bg-2)",
+                        color: isActive ? "var(--pg-accent)" : "var(--pg-text-dim)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon name={t.icon} size={15} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, lineHeight: 1.2 }}>
+                        {t.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--pg-text-faint)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {t.desc}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-            <ProfileSection title="Buyer background">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-                <ProfileSelect
-                  label="Buyer type"
-                  value={filterDraft.buyerType}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, buyerType: v } : d))}
-                  options={[
-                    ["owner-occupier", "Owner-occupier"],
-                    ["investor", "Investor"],
-                    ["downsizer", "Downsizer"],
-                    ["first-home", "First home buyer"],
-                  ]}
-                />
-                <ProfileSelect
-                  label="Purchase purpose"
-                  value={filterDraft.purchasePurpose}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, purchasePurpose: v } : d))}
-                  options={[
-                    ["PPOR", "Principal residence"],
-                    ["Investment", "Investment"],
-                    ["Holiday", "Holiday home"],
-                  ]}
-                />
-                <ProfileSelect
-                  label="Urgency"
-                  value={filterDraft.urgency}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, urgency: v } : d))}
-                  options={[
-                    ["ASAP", "ASAP"],
-                    ["1 month", "1 month"],
-                    ["3 months", "3 months"],
-                    ["6 months", "6+ months"],
-                  ]}
-                />
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gap: 14,
-                  marginTop: 14,
-                }}
-              >
-                <ProfileSelect
-                  label="Pre-approval status"
-                  value={filterDraft.preApprovalStatus}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, preApprovalStatus: v } : d))}
-                  options={[
-                    ["Not Started", "Not started"],
-                    ["In Progress", "In progress"],
-                    ["Approved", "Approved"],
-                    ["Expired", "Expired"],
-                  ]}
-                />
-                <ProfileSelect
-                  label="Auction willingness"
-                  value={filterDraft.auctionWillingness ? "yes" : "no"}
-                  onChange={(v) =>
-                    setFilterDraft((d) => (d ? { ...d, auctionWillingness: v === "yes" } : d))
-                  }
-                  options={[
-                    ["yes", "Will bid at auction"],
-                    ["no", "Prefers private sale"],
-                  ]}
-                />
-              </div>
-            </ProfileSection>
+            {/* Active section form card */}
+            <div className="pg-card" style={{ flex: 1, padding: 24, background: "var(--pg-surface)", minWidth: 0, overflow: "visible" }}>
+              {profileSubTab === "contact" && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                    <div style={{ color: "var(--pg-text-dim)", display: "flex" }}>
+                      <Icon name="users" size={18} />
+                    </div>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Contact Details</h3>
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "var(--pg-text-dim)", margin: "0 0 20px", lineHeight: 1.4 }}>
+                    Manage the client&rsquo;s basic information, communication channels, and active engagement status.
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <ProfileField
+                      label="Full name"
+                      value={filterDraft.clientName}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, clientName: v } : d))}
+                    />
+                    <ProfileField
+                      label="Email"
+                      value={filterDraft.email}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, email: v } : d))}
+                    />
+                    <ProfileField
+                      label="Phone"
+                      value={filterDraft.phone}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, phone: v } : d))}
+                    />
+                    <ProfileSelect
+                      label="Preferred contact"
+                      value={filterDraft.contactMethod}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, contactMethod: v } : d))}
+                      options={[
+                        ["email", "Email"],
+                        ["phone", "Phone"],
+                        ["sms", "SMS"],
+                      ]}
+                    />
+                    <ProfileSelect
+                      label="Engagement type"
+                      value={filterDraft.engagementType}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, engagementType: v } : d))}
+                      options={[
+                        ["full-service", "Full service"],
+                        ["auction-only", "Auction only"],
+                        ["consult", "Consult only"],
+                      ]}
+                    />
+                    <ProfileSelect
+                      label="Brief status"
+                      value={filterDraft.status}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, status: v } : d))}
+                      options={[
+                        ["searching", "Searching"],
+                        ["under-offer", "Under offer"],
+                        ["settled", "Settled"],
+                        ["paused", "Paused"],
+                      ]}
+                    />
+                  </div>
+                </div>
+              )}
 
-            <ProfileSection title="Search criteria">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-                <ProfileField
-                  label="Budget min ($)"
-                  value={filterDraft.budgetMin}
-                  placeholder="e.g. 800000"
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, budgetMin: v } : d))}
-                />
-                <ProfileField
-                  label="Budget max ($)"
-                  value={filterDraft.budgetMax}
-                  placeholder="e.g. 1500000"
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, budgetMax: v } : d))}
-                />
-                <ProfileSelect
-                  label="Parking"
-                  value={filterDraft.parking}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, parking: v } : d))}
-                  options={[
-                    ["not_needed", "Not needed"],
-                    ["nice_to_have", "Nice to have"],
-                    ["required", "Required"],
-                  ]}
-                />
-                <ProfileField
-                  label="Min bedrooms"
-                  value={filterDraft.minBeds}
-                  type="number"
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, minBeds: v } : d))}
-                />
-                <ProfileField
-                  label="Min bathrooms"
-                  value={filterDraft.minBaths}
-                  type="number"
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, minBaths: v } : d))}
-                />
-              </div>
-              <div
-                style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}
-              >
-                <TagInput
-                  label="Suburbs"
-                  value={filterDraft.suburbs}
-                  placeholder="Type to search or add…"
-                  suggestions={suburbSuggestions}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, suburbs: v } : d))}
-                />
-                <TagInput
-                  label="Property types"
-                  value={filterDraft.propertyTypes}
-                  placeholder="Type to search or add…"
-                  suggestions={PROPERTY_TYPE_SUGGESTIONS}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, propertyTypes: v } : d))}
-                />
-              </div>
-            </ProfileSection>
+              {profileSubTab === "buyer" && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                    <div style={{ color: "var(--pg-text-dim)", display: "flex" }}>
+                      <Icon name="briefcase" size={18} />
+                    </div>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Buyer Background</h3>
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "var(--pg-text-dim)", margin: "0 0 20px", lineHeight: 1.4 }}>
+                    Record the buyer&rsquo;s motivations, urgency level, financial readiness, and auction eligibility.
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <ProfileSelect
+                      label="Buyer type"
+                      value={filterDraft.buyerType}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, buyerType: v } : d))}
+                      options={[
+                        ["owner-occupier", "Owner-occupier"],
+                        ["investor", "Investor"],
+                        ["downsizer", "Downsizer"],
+                        ["first-home", "First home buyer"],
+                      ]}
+                    />
+                    <ProfileSelect
+                      label="Purchase purpose"
+                      value={filterDraft.purchasePurpose}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, purchasePurpose: v } : d))}
+                      options={[
+                        ["PPOR", "Principal residence"],
+                        ["Investment", "Investment"],
+                        ["Holiday", "Holiday home"],
+                      ]}
+                    />
+                    <ProfileSelect
+                      label="Urgency"
+                      value={filterDraft.urgency}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, urgency: v } : d))}
+                      options={[
+                        ["ASAP", "ASAP"],
+                        ["1 month", "1 month"],
+                        ["3 months", "3 months"],
+                        ["6 months", "6+ months"],
+                      ]}
+                    />
+                    <ProfileSelect
+                      label="Pre-approval status"
+                      value={filterDraft.preApprovalStatus}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, preApprovalStatus: v } : d))}
+                      options={[
+                        ["Not Started", "Not started"],
+                        ["In Progress", "In progress"],
+                        ["Approved", "Approved"],
+                        ["Expired", "Expired"],
+                      ]}
+                    />
+                    <ProfileSelect
+                      label="Auction willingness"
+                      value={filterDraft.auctionWillingness ? "yes" : "no"}
+                      onChange={(v) =>
+                        setFilterDraft((d) => (d ? { ...d, auctionWillingness: v === "yes" } : d))
+                      }
+                      options={[
+                        ["yes", "Will bid at auction"],
+                        ["no", "Prefers private sale"],
+                      ]}
+                    />
+                  </div>
+                </div>
+              )}
 
-            <ProfileSection title="Must-haves & deal-breakers">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <TagInput
-                  label="Must-haves"
-                  value={filterDraft.mustHaves}
-                  placeholder="e.g. North-facing, garage, study…"
-                  suggestions={FEATURE_SUGGESTIONS}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, mustHaves: v } : d))}
-                />
-                <TagInput
-                  label="Deal-breakers"
-                  value={filterDraft.dealBreakers}
-                  placeholder="e.g. Busy road, strata, flood zone…"
-                  suggestions={FEATURE_SUGGESTIONS}
-                  onChange={(v) => setFilterDraft((d) => (d ? { ...d, dealBreakers: v } : d))}
-                />
-              </div>
-            </ProfileSection>
+              {profileSubTab === "search" && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                    <div style={{ color: "var(--pg-text-dim)", display: "flex" }}>
+                      <Icon name="home" size={18} />
+                    </div>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Search Criteria</h3>
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "var(--pg-text-dim)", margin: "0 0 20px", lineHeight: 1.4 }}>
+                    Define the geographic boundaries, target budgets, and property specifications.
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <ProfileField
+                      label="Budget min ($)"
+                      value={filterDraft.budgetMin}
+                      placeholder="e.g. 800000"
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, budgetMin: v } : d))}
+                    />
+                    <ProfileField
+                      label="Budget max ($)"
+                      value={filterDraft.budgetMax}
+                      placeholder="e.g. 1500000"
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, budgetMax: v } : d))}
+                    />
+                    <ProfileSelect
+                      label="Parking"
+                      value={filterDraft.parking}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, parking: v } : d))}
+                      options={[
+                        ["not_needed", "Not needed"],
+                        ["nice_to_have", "Nice to have"],
+                        ["required", "Required"],
+                      ]}
+                    />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <ProfileField
+                        label="Min bedrooms"
+                        value={filterDraft.minBeds}
+                        type="number"
+                        onChange={(v) => setFilterDraft((d) => (d ? { ...d, minBeds: v } : d))}
+                      />
+                      <ProfileField
+                        label="Min bathrooms"
+                        value={filterDraft.minBaths}
+                        type="number"
+                        onChange={(v) => setFilterDraft((d) => (d ? { ...d, minBaths: v } : d))}
+                      />
+                    </div>
+                    <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 4 }}>
+                      <TagInput
+                        label="Suburbs"
+                        value={filterDraft.suburbs}
+                        placeholder="Type to search or add…"
+                        suggestions={suburbSuggestions}
+                        onChange={(v) => setFilterDraft((d) => (d ? { ...d, suburbs: v } : d))}
+                      />
+                      <TagInput
+                        label="Property types"
+                        value={filterDraft.propertyTypes}
+                        placeholder="Type to search or add…"
+                        suggestions={PROPERTY_TYPE_SUGGESTIONS}
+                        onChange={(v) => setFilterDraft((d) => (d ? { ...d, propertyTypes: v } : d))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button
-                className="pg-btn pg-btn-accent"
-                disabled={savingFilter}
-                onClick={() => saveFilterToBrief().then(() => setTab("matches"))}
-              >
-                {savingFilter ? (
-                  <>
-                    <Spinner />
-                    Saving…
-                  </>
-                ) : (
-                  "Save and apply"
-                )}
-              </button>
-              <button
-                className="pg-btn pg-btn-ghost"
-                disabled={savingFilter}
-                onClick={() => {
-                  setFilterDraft(filter);
-                  setTab("matches");
-                }}
-              >
-                Cancel
-              </button>
+              {profileSubTab === "preferences" && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                    <div style={{ color: "var(--pg-text-dim)", display: "flex" }}>
+                      <Icon name="sliders" size={18} />
+                    </div>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Must-haves & Deal-breakers</h3>
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "var(--pg-text-dim)", margin: "0 0 20px", lineHeight: 1.4 }}>
+                    Fine-tune search quality by specifying key features the property must include or avoid.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <TagInput
+                      label="Must-haves"
+                      value={filterDraft.mustHaves}
+                      placeholder="e.g. North-facing, garage, study…"
+                      suggestions={FEATURE_SUGGESTIONS}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, mustHaves: v } : d))}
+                    />
+                    <TagInput
+                      label="Deal-breakers"
+                      value={filterDraft.dealBreakers}
+                      placeholder="e.g. Busy road, strata, flood zone…"
+                      suggestions={FEATURE_SUGGESTIONS}
+                      onChange={(v) => setFilterDraft((d) => (d ? { ...d, dealBreakers: v } : d))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Action buttons footer */}
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--pg-border)", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="pg-btn pg-btn-ghost"
+                  disabled={savingFilter || justSaved}
+                  onClick={() => {
+                    setFilterDraft(filter);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="pg-btn pg-btn-accent"
+                  disabled={savingFilter || justSaved}
+                  onClick={() => {
+                    saveFilterToBrief().then(() => {
+                      setJustSaved(true);
+                      setTimeout(() => setJustSaved(false), 2000);
+                    });
+                  }}
+                  style={{ minWidth: 120, justifyContent: "center" }}
+                >
+                  {savingFilter ? (
+                    <>
+                      <Spinner />
+                      Saving…
+                    </>
+                  ) : justSaved ? (
+                    <>
+                      <Icon name="check" size={13} />
+                      Saved!
+                    </>
+                  ) : (
+                    "Save changes"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1438,25 +1561,6 @@ function Spinner() {
 
 // ── Profile tab helpers ───────────────────────────────────────────────────────
 
-function ProfileSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: 28 }}>
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          color: "var(--pg-text-faint)",
-          marginBottom: 14,
-        }}
-      >
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
 
 function ProfileField({
   label,
