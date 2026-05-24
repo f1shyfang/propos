@@ -1,5 +1,7 @@
 # 08 — Feature Specifications
 
+> **Canonical status:** Future/platform reference only. For the hackathon MVP, follow [../TECH-SPEC.md](../TECH-SPEC.md), [../DATA-MODEL.md](../DATA-MODEL.md), [../API-SPEC.md](../API-SPEC.md), [../ROUTE-MAP.md](../ROUTE-MAP.md), [../COMPONENT-TREE.md](../COMPONENT-TREE.md), and [../IMPLEMENTATION-PLAN.md](../IMPLEMENTATION-PLAN.md). Dynamic brief wizards, finance tracking, document vaults, offer management, co-buyer workflows, maps, Kanban boards, notifications, and settlement tooling are post-MVP.
+
 ## Document Purpose
 
 This document specifies every feature across all six phases of the Buyer's Agent SaaS platform. Each feature is described with user stories, data requirements, business logic, dependencies, and acceptance criteria. The platform is purpose-built for sole operators and small Australian BA agencies (2–10 agents).

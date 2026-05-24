@@ -18,7 +18,7 @@ A typical Australian buyer's agent works across 6–8 disconnected tools per tra
 
 ## 3. Solution
 
-A single platform built during the 48-hour hackathon that delivers the essential workflow: **Brief → Match → Shortlist → Share → Feedback → Refresh**. The agent creates a structured buyer brief, browses pre-scored property matches, compares properties side-by-side with CMA and risk data, shortlists and shares with the client, and receives structured feedback (approve/reject/comment) via polling. No live API integrations, no AI/ML — all data is pre-seeded and all matching scores are pre-computed. This proves the unified-platform value proposition without the integration complexity.
+A single platform built during the 48-hour hackathon that delivers the essential workflow: **Brief -> Match -> Shortlist -> Share -> Feedback -> Refresh**. The agent creates a structured buyer brief, browses pre-scored property matches, compares properties side-by-side with CMA and risk data, shortlists and shares with the client, and receives structured feedback (Interested / Need More Info / Not For Me plus optional comments) via polling. No live API integrations, no AI/ML - all data is pre-seeded and all matching scores are pre-computed. This proves the unified-platform value proposition without the integration complexity.
 
 ---
 
@@ -41,7 +41,7 @@ A single platform built during the 48-hour hackathon that delivers the essential
 | 3 | Buyer's agent | Expand a property card to see listing details, CMA (comparable sales), and risk overlays | I perform due diligence without opening CoreLogic and council websites in separate tabs |
 | 4 | Buyer's agent | Compare 2–3 properties side-by-side with match scores, CMA ranges, and risk badges | I evaluate options analytically instead of flipping between tabs and spreadsheets |
 | 5 | Buyer's agent | Add properties to a shortlist and share with the client | The client sees a curated selection in a branded portal instead of random links |
-| 6 | Buyer client | Log in, view shared properties, and provide structured feedback (approve/reject/comment) | My agent knows exactly how I feel about each property without messy WhatsApp threads |
+| 6 | Buyer client | Log in, view shared properties, and provide structured feedback (Interested / Need More Info / Not For Me plus optional comments) | My agent knows exactly how I feel about each property without messy WhatsApp threads |
 | 7 | Buyer's agent | See client feedback appear in the dashboard via polling | I act on client decisions immediately without waiting for forwarded emails |
 
 ---
@@ -52,14 +52,14 @@ A single platform built during the 48-hour hackathon that delivers the essential
 
 | Feature | Rationale |
 |---|---|
-| Agent login (email/password via Supabase Auth) | Already working. Entry point for the demo. |
+| Agent login (email/password via Supabase Auth) | Low-friction entry point for the demo. |
 | Buyer brief creation form (single-page) | Proves structured needs capture — the platform's input signal (per Doc 10 §1.1) |
 | Property listing page with search/filter (suburb, price, beds, type) | Proves unified browsing without portal-hopping across 25 seed properties |
 | Property detail card with CMA + risk badges | Proves due-diligence-in-one-place — 2–3 comparable sales + flood/heritage/bushfire tags |
 | Property comparison view (2–3 side-by-side) | Proves analysis capability beyond spreadsheets — match scores, CMA, risk in one glance |
 | Shortlist (add/remove, share with client) | Proves agent-client curation workflow |
 | Client login (email/password) | Enables the client persona demo |
-| Client portal — view shared shortlist + approve/reject/comment | Proves structured feedback loop (per Doc 08 §4.3) |
+| Client portal - view shared shortlist + structured feedback | Proves structured feedback loop with Interested / Need More Info / Not For Me and optional comments (per Doc 08 §4.3) |
 | Agent dashboard — polling for client feedback (3s interval + manual Refresh) | Proves real-time visibility into client decisions (via `@tanstack/react-query` `refetchInterval`) |
 | User action event logging (`user_actions` table) | Foundation for future analytics/ML — ~30 min investment (per Doc 10 §3.3) |
 
@@ -74,9 +74,9 @@ A single platform built during the 48-hour hackathon that delivers the essential
 | Milestone tracking | Phase 6 — meaningful only after a property is selected |
 | Email/SMS notifications | Requires third-party gateway setup |
 | Payment/subscription | Not relevant to a single-agent demo |
-| Multi-tenancy / RBAC | Two hardcoded users: one agent, one client |
+| Full multi-tenancy / admin RBAC | MVP uses one agent role and one client role only |
 | Map view | Geocoding + map component is 4+ hours for marginal demo value |
-| Kanban/pipeline board | Status column on the shortlist table suffices |
+| Kanban/pipeline board | Shared/unshared state and feedback status on shortlist rows are enough for MVP |
 | WebSockets | Polling via `@tanstack/react-query` is one line vs. WebSocket infrastructure |
 | Rich text / PDF generation | Plain text for all fields; browser print if needed |
 | Swipe-based feedback (Tinder-style) | Intentionally avoided — property decisions are high-stakes, not rapid-fire entertainment (per Doc 08 §4.3 design rationale) |
@@ -95,7 +95,7 @@ A single platform built during the 48-hour hackathon that delivers the essential
 
 **Scene 5 — Shortlist & Share (30s):** Add 3 properties to shortlist. Click "Share with Client." "Now let's switch to the client's experience."
 
-**Scene 6 — Client Portal & Feedback Loop (75s):** Incognito window — Sarah logs in. Sees 3 properties with Approve/Reject/Comment. Approves Union Street ("Love the balcony — inspect this weekend?"), rejects another ("Ground floor — no go"), comments on the third. Switch back to agent dashboard — feedback loaded via polling. 1 approved, 1 rejected, 1 with comment. "One platform, one workflow."
+**Scene 6 - Client Portal & Feedback Loop (75s):** Incognito window - Sarah logs in. Sees 3 shared properties. Marks Union Street as Interested ("Love the balcony - inspect this weekend?"), marks another as Not For Me ("Ground floor - no go"), and marks the third as Need More Info. Switch back to agent dashboard - feedback loaded via polling. "One platform, one workflow."
 
 **Demo setup:** Agent dashboard and client portal visible side-by-side on screen throughout.
 
@@ -108,7 +108,7 @@ A single platform built during the 48-hour hackathon that delivers the essential
 - [ ] Property detail card shows CMA data (2–3 comparables) and risk badges
 - [ ] 2–3 properties can be compared side-by-side with match scores, CMA, and risk
 - [ ] Agent can add/remove properties from a shortlist and share it with a client
-- [ ] Client can log in, view the shared shortlist, and approve/reject/comment on properties
+- [ ] Client can log in, view the shared shortlist, and submit Interested / Need More Info / Not For Me feedback with optional comments
 - [ ] Agent dashboard polls for and displays client feedback within 3 seconds
 - [ ] Full demo flow completes end-to-end with no console errors or visible bugs
 - [ ] Demo works locally on the presenter's machine (`npm run dev`)
@@ -130,11 +130,11 @@ All features beyond the core brief→match→shortlist→feedback loop are defer
 
 | Decision | Rationale |
 |---|---|
-| **Button feedback over swipe UI** | Property decisions are high-stakes financial commitments, not rapid-fire entertainment. Three explicit buttons (Approve/Reject/Comment) on the property detail view force considered decisions (per Doc 08 §4.3). |
-| **Single pipeline, no kanban** | A status column on the shortlist table communicates the workflow without building a drag-and-drop kanban component in 48 hours. |
+| **Button feedback over swipe UI** | Property decisions are high-stakes financial commitments, not rapid-fire entertainment. Three explicit buttons (Interested / Need More Info / Not For Me) plus an optional comment field force considered decisions (per Doc 08 §4.3). |
+| **Single pipeline, no kanban** | Shared/unshared state and client feedback status communicate the workflow without building a drag-and-drop kanban component in 48 hours. |
 | **Pre-computed match scores, no live matching engine** | Rule-based scoring exists in code for demo walkthrough but all scores are stored in seed data. Avoids runtime bugs and ensures deterministic demo behaviour (per Doc 10 §2.6). |
 | **Polling, not WebSockets** | `@tanstack/react-query` `refetchInterval: 3000` + manual Refresh button achieves the same UX with zero infrastructure. WebSockets add deployment complexity for no demo gain (per Doc 10 §1.4). |
-| **Supabase over SQLite** | Supabase (Postgres) is already integrated with working auth. The blueprint's SQLite recommendation was made before the Supabase decision — swapping now would cost 4+ hours. |
+| **Supabase over SQLite** | Supabase gives the MVP hosted Postgres, Auth, RLS, and Storage in one stack. SQLite/Prisma would require rebuilding auth, security boundaries, and deployment assumptions for no demo gain. |
 | **25 seed properties, Sydney-only** | Diverse enough for meaningful filtering, small enough for fast seed loading. Sydney offers globally recognisable suburbs and a wide price spectrum ($500K–$4M+) for varied demo scenarios (per Doc 10 §2.1). |
 | **Two hardcoded users, no registration flow** | Eliminates account creation friction during the demo. The login form exists solely as a demo entry point. |
 | **Local-only demo (`npm run dev`)** | No deployment dependency. Eliminates risk of Vercel cold starts, network latency, and API failures during the live demo (per Doc 10 §5.2). |
@@ -143,7 +143,7 @@ All features beyond the core brief→match→shortlist→feedback loop are defer
 
 ## Document Status
 
-- **Version:** 1.1
-- **Last Updated:** May 23, 2026
+- **Version:** 1.2
+- **Last Updated:** May 24, 2026
 - **References:** Blueprint Doc 01 (Vision), Doc 08 (Features), Doc 10 (Hackathon MVP Spec), Doc 11 (Roadmap)
-- **Revision:** Scene 2 demo flow clarified — navigation to `/briefs/[id]/matches` instead of generic "Properties tab."
+- **Revision:** Canonical MVP language aligned to Supabase, unversioned APIs, and structured feedback states.

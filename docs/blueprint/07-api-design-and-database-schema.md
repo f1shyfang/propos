@@ -1,5 +1,7 @@
 # 07 — API Design & Database Schema
 
+> **Canonical status:** Future/platform reference only. For the hackathon MVP, follow [../TECH-SPEC.md](../TECH-SPEC.md), [../DATA-MODEL.md](../DATA-MODEL.md), [../API-SPEC.md](../API-SPEC.md), [../ROUTE-MAP.md](../ROUTE-MAP.md), [../COMPONENT-TREE.md](../COMPONENT-TREE.md), and [../IMPLEMENTATION-PLAN.md](../IMPLEMENTATION-PLAN.md). `/api/v1`, bespoke JWT refresh-token flows, agency-scoped multi-tenancy, admin roles, and the larger schema in this file are post-MVP unless copied into the canonical docs.
+
 ---
 
 ## PART A: API DESIGN
