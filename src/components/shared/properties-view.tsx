@@ -261,8 +261,7 @@ export function PropertiesView({ initialPins, defaultCenter }: {
                       </div>
                     )}
                     <div
-                      onMouseEnter={() => setActivePin(pin.id)}
-                      onMouseLeave={() => setActivePin(null)}
+                      onClick={e => { e.stopPropagation(); setActivePin(activePin === pin.id ? null : pin.id); }}
                       style={{
                         position: 'relative', zIndex: 1000,
                         width: size, height: size, borderRadius: '50%',
