@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { intakeTranscriptionsTable } from '@/lib/db/schema';
 import { parseBriefFromTranscript } from '@/lib/intake/parse-brief-from-transcript';
+import { enforceOpenAiRateLimit } from '@/lib/openai-rate-limit-response';
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimited = enforceOpenAiRateLimit(req, 'parse');
+    if (rateLimited) return rateLimited;
+
     const body = await req.json();
     const { transcript, source, originalFilename } = body as {
       transcript?: string;

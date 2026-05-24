@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { validateM4aUpload } from '@/lib/intake/validate-m4a';
+import { enforceOpenAiRateLimit } from '@/lib/openai-rate-limit-response';
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimited = enforceOpenAiRateLimit(req, 'transcribe');
+    if (rateLimited) return rateLimited;
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: 'OPENAI_API_KEY is not configured' }, { status: 503 });
