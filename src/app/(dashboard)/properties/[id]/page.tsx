@@ -1,13 +1,16 @@
 import { Suspense } from 'react';
 import { db } from '@/lib/db';
-import { cmaRecordsTable, propertiesTable, suburbsTable } from '@/lib/db/schema';
-import { desc, eq, sql } from 'drizzle-orm';
+import { buyerBriefsTable, cmaRecordsTable, propertiesTable, suburbsTable } from '@/lib/db/schema';
+import { asc, desc, eq, sql } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import { PropertyThumb } from '@/components/shared/property-thumb';
 import { MatchScore } from '@/components/shared/match-score';
 import { PropertyShortlistActions } from '@/components/shortlists/property-shortlist-actions';
 import { calculatePricePerSqm } from '@/lib/cma-utils';
+import { computeMatchScore } from '@/lib/match-score';
+import { briefRowToCriteria, propertyRowToMatchInput, suburbMatches } from '@/lib/match-properties-for-brief';
+import { propertyTypesMatch } from '@/lib/property-type-utils';
 
 function scoreToMatchPct(overall: number | null): number {
   if (!overall) return 50;
@@ -73,18 +76,65 @@ async function fetchRiskOverlay(lat: number, lng: number, state: string | null):
   };
 }
 
-export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PropertyDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ briefId?: string }>;
+}) {
   const { id } = await params;
+  const { briefId: briefIdParam } = await searchParams;
+  const selectedBriefId = briefIdParam ? Number(briefIdParam) : null;
 
-  const rows = await db.select()
-    .from(propertiesTable)
-    .leftJoin(suburbsTable, eq(propertiesTable.suburbId, suburbsTable.suburbId))
-    .where(eq(propertiesTable.id, id))
-    .limit(1);
+  const [rows, allBriefs] = await Promise.all([
+    db.select()
+      .from(propertiesTable)
+      .leftJoin(suburbsTable, eq(propertiesTable.suburbId, suburbsTable.suburbId))
+      .where(eq(propertiesTable.id, id))
+      .limit(1),
+    db.select({ id: buyerBriefsTable.id, clientName: buyerBriefsTable.clientName })
+      .from(buyerBriefsTable)
+      .orderBy(asc(buyerBriefsTable.clientName)),
+  ]);
 
   if (!rows.length) notFound();
 
   const { properties: p, suburbs: s } = rows[0];
+
+  // Per-brief scoring when a client is selected
+  let selectedBrief: typeof buyerBriefsTable.$inferSelect | null = null;
+  let perBriefScore: number | null = null;
+  let briefBreakdown: {
+    budgetOk: boolean;
+    suburbOk: boolean;
+    typeOk: boolean;
+    bedsOk: boolean;
+    bathsOk: boolean;
+    parkingOk: boolean;
+  } | null = null;
+
+  if (selectedBriefId) {
+    const briefRows = await db.select()
+      .from(buyerBriefsTable)
+      .where(eq(buyerBriefsTable.id, selectedBriefId))
+      .limit(1);
+    selectedBrief = briefRows[0] ?? null;
+    if (selectedBrief) {
+      const criteria = briefRowToCriteria(selectedBrief);
+      const matchInput = propertyRowToMatchInput(p);
+      perBriefScore = computeMatchScore(matchInput, criteria);
+      briefBreakdown = {
+        budgetOk: (p.price ?? 0) >= criteria.budgetMin && (p.price ?? 0) <= criteria.budgetMax,
+        suburbOk: suburbMatches(criteria.suburbs, p.suburb ?? ''),
+        typeOk: propertyTypesMatch(criteria.propertyTypes, p.propertyType ?? ''),
+        bedsOk: (p.bedrooms ?? 0) >= criteria.minBeds,
+        bathsOk: (p.bathrooms ?? 0) >= criteria.minBaths,
+        parkingOk: criteria.parking !== 'required' || !!p.parkingSpaces,
+      };
+    }
+  }
+
   const matchScore = scoreToMatchPct(p.overallScore);
 
   type SchoolRow = { id: number; name: string; type: string | null; sector: string | null; distanceKm: number };
@@ -180,7 +230,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 <span className="pg-badge pg-badge-green pg-badge-dot">For Sale</span>
-                <span className="pg-badge pg-badge-yellow"><Icon name="sparkles" size={10} /> AI matched · {matchScore}</span>
+                <span className={`pg-badge ${matchScore >= 80 ? 'pg-badge-green' : matchScore >= 65 ? 'pg-badge-yellow' : 'pg-badge-red'}`}><Icon name="sparkles" size={10} /> AI matched · {matchScore}</span>
                 {p.days != null && <span style={{ fontSize: 11.5, color: 'var(--pg-text-faint)' }}>· {p.days} days on market</span>}
               </div>
               <h1 className="pg-display" style={{ margin: 0, fontSize: 32, fontWeight: 600, letterSpacing: '-0.025em', lineHeight: 1.1 }}>
@@ -248,33 +298,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                   {s.name} suburb — population {s.population?.toLocaleString() ?? '—'}.
                 </p>
               )}
-            </div>
-
-            {/* Match card */}
-            <div style={{ background: 'var(--pg-accent-soft)', border: '1px solid rgba(229,177,0,0.25)', borderRadius: 10, padding: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <Icon name="sparkles" size={14} color="var(--pg-accent)" />
-                <span style={{ fontSize: 12, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#806000' }}>Propos Score Breakdown</span>
-                <div style={{ flex: 1 }} />
-                <MatchScore score={matchScore} size={32} stroke={3} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px 24px' }}>
-                {[
-                  { ok: (p.sweetspotScore ?? 0) >= 50, l: `Sweetspot score: ${p.sweetspotScore ?? '—'}/100` },
-                  { ok: (p.confidenceScore ?? 0) >= 70, l: `Confidence: ${p.confidenceScore ?? '—'}/100` },
-                  { ok: (p.distressScore ?? 0) <= 50, l: `Distress level: ${p.distressScore ?? '—'}/100` },
-                  { ok: p.underOffer === 0, l: p.underOffer ? 'Under offer' : 'Not under offer' },
-                  { ok: p.grossYield != null && p.grossYield > 0.03, l: p.grossYield ? `Gross yield: ${(p.grossYield * 100).toFixed(1)}%` : 'Yield data pending' },
-                  { ok: (p.rScore ?? 0) >= 70, l: `R-score: ${p.rScore ?? '—'}` },
-                ].map((m, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-                    <div style={{ width: 16, height: 16, borderRadius: 999, flexShrink: 0, background: m.ok ? 'var(--pg-green)' : 'var(--pg-text-very-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-                      <Icon name={m.ok ? 'check' : 'minus'} size={10} color="#FFF" strokeWidth={3} />
-                    </div>
-                    <div style={{ fontSize: 13, color: m.ok ? 'var(--pg-text)' : 'var(--pg-text-dim)' }}>{m.l}</div>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* Nearby Schools */}
@@ -356,10 +379,71 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
         {/* RIGHT sidebar */}
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Actions */}
+          {/* Actions (includes buyer brief selector) */}
           <Suspense fallback={<div className="pg-card" style={{ padding: 18, fontSize: 13, color: 'var(--pg-text-dim)' }}>Loading actions…</div>}>
             <PropertyShortlistActions propertyId={id} />
           </Suspense>
+
+          {/* Per-brief match breakdown — shown when a brief is selected */}
+          {briefBreakdown && (
+            <div style={{ background: 'var(--pg-bg-2)', border: '1px solid var(--pg-border)', borderRadius: 10, padding: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <Icon name="sparkles" size={13} color="var(--pg-text-dim)" />
+                <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--pg-text-dim)' }}>
+                  {selectedBrief!.clientName} match
+                </span>
+                <div style={{ flex: 1 }} />
+                {perBriefScore === 0
+                  ? <span className="pg-badge pg-badge-red" style={{ fontSize: 10 }}>No match</span>
+                  : <MatchScore score={perBriefScore!} size={28} stroke={2.5} />
+                }
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[
+                  { ok: briefBreakdown.budgetOk, l: briefBreakdown.budgetOk ? `Budget: ${price} in range` : `Budget: ${price} out of range` },
+                  { ok: briefBreakdown.suburbOk, l: briefBreakdown.suburbOk ? `Suburb: ${p.suburb} matches` : `Suburb: ${p.suburb} not in brief` },
+                  { ok: briefBreakdown.typeOk, l: briefBreakdown.typeOk ? `Type: ${p.propertyType} matches` : `Type: ${p.propertyType} not in brief` },
+                  { ok: briefBreakdown.bedsOk, l: briefBreakdown.bedsOk ? `Beds: ${p.bedrooms ?? '—'} meets min` : `Beds: ${p.bedrooms ?? '—'} below min` },
+                  { ok: briefBreakdown.bathsOk, l: briefBreakdown.bathsOk ? `Baths: ${p.bathrooms ?? '—'} meets min` : `Baths: ${p.bathrooms ?? '—'} below min` },
+                  { ok: briefBreakdown.parkingOk, l: briefBreakdown.parkingOk ? `Parking: ${p.parkingSpaces ? `${p.parkingSpaces} space${p.parkingSpaces !== 1 ? 's' : ''}` : 'not required'}` : 'Parking: required but none' },
+                ].map((m, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 13, height: 13, borderRadius: 999, flexShrink: 0, background: m.ok ? 'var(--pg-green)' : 'var(--pg-red, #ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name={m.ok ? 'check' : 'minus'} size={9} color="#FFF" strokeWidth={3} />
+                    </div>
+                    <div style={{ fontSize: 12, color: m.ok ? 'var(--pg-text)' : 'var(--pg-text-dim)' }}>{m.l}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Propos score breakdown */}
+          <div style={{ background: 'var(--pg-bg-2)', border: '1px solid var(--pg-border)', borderRadius: 10, padding: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Icon name="sparkles" size={13} color="var(--pg-text-dim)" />
+              <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--pg-text-dim)' }}>Propos Score</span>
+              <div style={{ flex: 1 }} />
+              <MatchScore score={matchScore} size={28} stroke={2.5} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px' }}>
+              {[
+                { ok: (p.sweetspotScore ?? 0) >= 50, l: `Sweetspot: ${p.sweetspotScore ?? '—'}` },
+                { ok: (p.confidenceScore ?? 0) >= 70, l: `Confidence: ${p.confidenceScore ?? '—'}` },
+                { ok: (p.distressScore ?? 0) <= 50, l: `Distress: ${p.distressScore ?? '—'}` },
+                { ok: p.underOffer === 0, l: p.underOffer ? 'Under offer' : 'Not under offer' },
+                { ok: p.grossYield != null && p.grossYield > 0.03, l: p.grossYield ? `Yield: ${(p.grossYield * 100).toFixed(1)}%` : 'Yield pending' },
+                { ok: (p.rScore ?? 0) >= 70, l: `R-score: ${p.rScore ?? '—'}` },
+              ].map((m, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <div style={{ width: 13, height: 13, borderRadius: 999, flexShrink: 0, background: m.ok ? 'var(--pg-green)' : 'var(--pg-text-very-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name={m.ok ? 'check' : 'minus'} size={9} color="#FFF" strokeWidth={3} />
+                  </div>
+                  <div style={{ fontSize: 11.5, color: m.ok ? 'var(--pg-text)' : 'var(--pg-text-dim)' }}>{m.l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* Listing agent */}
           <div>

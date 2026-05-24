@@ -8,7 +8,7 @@ export function MatchScore({ score = 80, size = 32, stroke = 3 }: MatchScoreProp
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - score / 100);
-  const color = score >= 80 ? 'var(--pg-green)' : score >= 65 ? 'var(--pg-accent)' : 'var(--pg-text-faint)';
+  const color = score >= 80 ? 'var(--pg-green)' : score >= 65 ? 'var(--pg-accent)' : 'var(--pg-red, #ef4444)';
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>

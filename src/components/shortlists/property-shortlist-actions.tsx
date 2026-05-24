@@ -26,9 +26,16 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
       .then((d) => {
         const list = d.briefs ?? [];
         setBriefs(list);
-        if (!briefId && list.length > 0) setBriefId(list[0].id);
+        if (!briefId && list.length > 0) {
+          const firstId = list[0].id;
+          setBriefId(firstId);
+          // Sync URL so the server component computes the score for this brief
+          const url = new URL(window.location.href);
+          url.searchParams.set('briefId', String(firstId));
+          router.replace(url.pathname + url.search, { scroll: false });
+        }
       });
-  }, [briefId]);
+  }, [briefId, router]);
 
   useEffect(() => {
     if (!briefId) return;
@@ -147,7 +154,13 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
             className="pg-input"
             style={{ width: '100%', marginTop: 4, fontSize: 13 }}
             value={briefId ?? ''}
-            onChange={(e) => setBriefId(Number(e.target.value))}
+            onChange={(e) => {
+              const newId = Number(e.target.value);
+              setBriefId(newId);
+              const url = new URL(window.location.href);
+              url.searchParams.set('briefId', String(newId));
+              router.push(url.pathname + url.search, { scroll: false });
+            }}
           >
             {briefs.map((b) => (
               <option key={b.id} value={b.id}>{b.clientName}</option>

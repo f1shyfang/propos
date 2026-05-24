@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
     lng: Number(p.true_lng),
     address: (p.address as string) ?? '—',
     suburb: (p.suburb as string) ?? '—',
+    state: p.state as string | null,
     price: formatPrice(p.price as number | null, p.price_display as string | null),
     score: scoreToMatchPct(p.overall_score as number | null),
     underOffer: !!p.under_offer,
