@@ -1,137 +1,164 @@
 import { db } from '@/lib/db';
-import { propertiesTable } from '@/lib/db/schema';
+import { propertiesTable, dealsTable, buyerBriefsTable } from '@/lib/db/schema';
 import { count } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { TopBar } from '@/components/shared/top-bar';
 import { Icon } from '@/components/shared/icon';
 import { Sparkline } from '@/components/shared/sparkline';
 import { DashboardFeedback } from '@/components/shared/dashboard-feedback';
-
+import {
+  computePipelineSummary,
+  getAttentionItems,
+  formatPipelineValue,
+  type DealSummaryRow,
+} from '@/lib/deals';
 
 export default async function DashboardPage() {
-  const [propCount] = await Promise.all([
+  const today = new Date().toLocaleDateString('en-AU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+  });
+
+  const [propCount, dealRows] = await Promise.all([
     db.select({ n: count() }).from(propertiesTable),
+    db
+      .select({
+        id: dealsTable.id,
+        status: dealsTable.status,
+        price: propertiesTable.price,
+        offerAmount: dealsTable.offerAmount,
+        settlementDate: dealsTable.settlementDate,
+        exchangeDate: dealsTable.exchangeDate,
+        priority: dealsTable.priority,
+        address: propertiesTable.address,
+        suburb: propertiesTable.suburb,
+        state: propertiesTable.state,
+        isAuction: dealsTable.isAuction,
+        clientName: buyerBriefsTable.clientName,
+      })
+      .from(dealsTable)
+      .leftJoin(propertiesTable, eq(dealsTable.propertyId, propertiesTable.id))
+      .leftJoin(buyerBriefsTable, eq(dealsTable.briefId, buyerBriefsTable.id)),
   ]);
 
   const totalProps = Number(propCount[0]?.n ?? 0);
 
+  const summaryRows: DealSummaryRow[] = dealRows.map((d) => ({
+    id: d.id,
+    status: d.status ?? 'suggested',
+    price: d.price,
+    offerAmount: d.offerAmount,
+    settlementDate: d.settlementDate?.toISOString() ?? null,
+    exchangeDate: d.exchangeDate?.toISOString() ?? null,
+    priority: d.priority ?? 'standard',
+    address: d.address,
+    suburb: d.suburb,
+    clientName: d.clientName,
+    state: d.state,
+    isAuction: d.isAuction ?? false,
+  }));
+
+  const pipeline = computePipelineSummary(summaryRows);
+  const attentionItems = getAttentionItems(summaryRows);
+  const activeStages = Object.keys(pipeline.stageCounts).filter(
+    (s) => !['settled', 'lost', 'withdrawn'].includes(s) && pipeline.stageCounts[s] > 0,
+  ).length;
+
+  const settledThisMonth = summaryRows.filter((d) => {
+    if (d.status !== 'settled' || !d.settlementDate) return false;
+    const sd = new Date(d.settlementDate);
+    const now = new Date();
+    return sd.getMonth() === now.getMonth() && sd.getFullYear() === now.getFullYear();
+  });
+
   return (
     <div style={{ padding: 0 }}>
       <TopBar
-        eyebrow="Tuesday, 23 May"
-        title="Good morning, Jess."
+        eyebrow={today}
+        title="Good morning."
         actions={
           <>
-            <button className="pg-btn"><Icon name="plus" size={13} />Add client</button>
-            <button className="pg-btn pg-btn-primary">
-              <Icon name="sparkles" size={13} />
-              8 new matches
-            </button>
+            <a href="/briefs/new" className="pg-btn"><Icon name="plus" size={13} />Add brief</a>
+            <a href="/pipeline" className="pg-btn pg-btn-primary">
+              <Icon name="pipeline" size={13} />
+              {pipeline.activeCount} in pipeline
+            </a>
           </>
         }
       />
 
       <div style={{ padding: '8px 32px 32px', display: 'flex', flexDirection: 'column', gap: 28 }}>
 
-        {/* Signal stats */}
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 36, paddingBottom: 24, borderBottom: '1px solid var(--pg-border)' }}>
           <Signal
-            label="Active clients"
-            value="23"
-            sub="3 onboarding this week"
-            spark={[8, 10, 9, 12, 14, 13, 17, 19, 18, 21, 23]}
-          />
-          <Signal
             label="In pipeline"
-            value="$48.2M"
-            sub="14 deals across 6 stages"
-            spark={[30, 33, 32, 36, 38, 41, 40, 44, 45, 48, 48]}
+            value={formatPipelineValue(pipeline.totalValue)}
+            sub={`${pipeline.activeCount} active deal${pipeline.activeCount === 1 ? '' : 's'} across ${activeStages || 0} stages`}
+            spark={[Math.max(1, pipeline.activeCount - 4), Math.max(1, pipeline.activeCount - 3), Math.max(1, pipeline.activeCount - 2), Math.max(1, pipeline.activeCount - 1), pipeline.activeCount]}
             trendColor="var(--pg-green)"
           />
           <Signal
-            label={`Properties tracked`}
+            label="Properties tracked"
             value={totalProps > 1000 ? `${(totalProps / 1000).toFixed(1)}K` : String(totalProps)}
-            sub="Settling this month: 6 · $11.8M"
+            sub={`${dealRows.length} total deal${dealRows.length === 1 ? '' : 's'} recorded`}
             spark={[1, 2, 2, 3, 4, 4, 5, 5, 6, 6, 6]}
+          />
+          <Signal
+            label="Settling this month"
+            value={String(settledThisMonth.length)}
+            sub={settledThisMonth.length ? formatPipelineValue(settledThisMonth.reduce((s, d) => s + (d.offerAmount ?? d.price ?? 0), 0)) : 'No settlements yet'}
+            spark={[0, 0, 1, 1, 2, settledThisMonth.length]}
+            trendColor="var(--pg-green)"
           />
         </section>
 
-        {/* Two-column body */}
         <section style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 48 }}>
-
-          {/* LEFT — Needs attention */}
           <div>
-            <SectionHead title="Needs your attention" sub="4 things — sorted by urgency" />
+            <SectionHead
+              title="Needs your attention"
+              sub={attentionItems.length ? `${attentionItems.length} thing${attentionItems.length === 1 ? '' : 's'} — sorted by urgency` : 'All clear for now'}
+            />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <AttentionRow
-                accent="red"
-                urgency="Today"
-                title="Cooling-off expires"
-                detail="12 Smith St, Richmond · Sarah & Tom Chen"
-                meta="NSW · 5 business days · ends 17:00"
-                action="Confirm unconditional"
-              />
-              <AttentionRow
-                accent="amber"
-                urgency="Reply needed"
-                title={<>Priya asked about strata levy <span style={{ color: 'var(--pg-text-faint)' }}>· 7 Brunswick St</span></>}
-                detail={<span style={{ fontStyle: 'italic' }}>&ldquo;What&apos;s the strata levy here? Quarterly?&rdquo;</span>}
-                meta="2 hours ago"
-                action="Reply"
-              />
-              <AttentionRow
-                accent="amber"
-                urgency="Decision"
-                title="Holloways: split decision on 18 Park Cres"
-                detail="Sarah Interested · Tom Need more info"
-                meta="Auction Saturday — 3 days away"
-                action="Open deal"
-              />
-              <AttentionRow
-                accent="gray"
-                urgency="Nudge"
-                title="Daniel Cho hasn&apos;t logged in for 6 days"
-                detail="3 unreviewed properties in his portal"
-                meta="Last seen Thursday"
-                action="Send reminder"
-              />
+              {attentionItems.length === 0 ? (
+                <div style={{ padding: '24px 0', color: 'var(--pg-text-faint)', fontSize: 13 }}>
+                  No urgent pipeline items. Check client feedback below.
+                </div>
+              ) : (
+                attentionItems.slice(0, 6).map((item) => (
+                  <AttentionRow
+                    key={`${item.type}-${item.dealId}`}
+                    accent={item.accent}
+                    urgency={item.urgency}
+                    title={item.title}
+                    detail={item.detail}
+                    meta={item.meta}
+                    action="Open deal"
+                    href={item.href}
+                  />
+                ))
+              )}
             </div>
           </div>
 
-          {/* RIGHT — This week */}
           <div>
-            <SectionHead title="This week" sub="6 milestones · drag to reorder" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {[
-                { day: 'Tue', date: '23', title: 'Cooling-off expires', sub: '12 Smith St, Richmond · Chen', state: 'Today', highlight: true },
-                { day: 'Wed', date: '24', title: 'Pre-settlement inspection', sub: '47 Domain Rd · Holloway · 4pm', state: 'Tomorrow' },
-                { day: 'Fri', date: '26', title: 'Auction · 14 Park St', sub: 'Webb · guide $1.6M · on-site 11am', state: 'In 3 days' },
-                { day: 'Mon', date: '29', title: 'Finance clause deadline', sub: '8 Erin St · Anand', state: 'In 6 days' },
-                { day: 'Wed', date: '31', title: 'Settlement · 22 Oak Ave', sub: 'Cho · $1.62M · PEXA ready', state: 'In 8 days' },
-                { day: 'Fri', date: '02 Jun', title: 'Building & pest review', sub: '203/55 Coventry St · Webb', state: 'In 10 days' },
-              ].map((m, i) => (
-                <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                  <div style={{ width: 44, flexShrink: 0, textAlign: 'right', paddingTop: 1 }}>
-                    <div style={{ fontFamily: 'var(--pg-font-display)', fontSize: 18, fontWeight: 600, lineHeight: 1, color: m.highlight ? 'var(--pg-text)' : 'var(--pg-text-dim)' }}>{m.date}</div>
-                    <div style={{ fontSize: 10, color: 'var(--pg-text-faint)', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 2 }}>{m.day}</div>
-                  </div>
-                  <div style={{ width: 6, marginTop: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: 999, background: m.highlight ? 'var(--pg-accent)' : 'var(--pg-text-very-faint)', flexShrink: 0 }} />
-                    {i < 5 && <div style={{ flex: 1, width: 1, background: 'var(--pg-border)', marginTop: 6 }} />}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0, paddingBottom: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--pg-text)' }}>{m.title}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)', marginTop: 2 }}>{m.sub}</div>
-                  </div>
-                  {m.highlight && (
-                    <span className="pg-badge pg-badge-yellow" style={{ fontSize: 10.5 }}>{m.state}</span>
-                  )}
+            <SectionHead title="Pipeline stages" sub="Live from your deals" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {['suggested', 'approved', 'due_diligence', 'offer_made', 'under_contract', 'settled'].map((stage) => (
+                <div key={stage} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
+                  <span style={{ flex: 1, textTransform: 'capitalize' }}>{stage.replace(/_/g, ' ')}</span>
+                  <span className="pg-mono" style={{ color: 'var(--pg-text-dim)' }}>
+                    {pipeline.stageCounts[stage] ?? 0}
+                  </span>
                 </div>
               ))}
+              <a href="/pipeline" className="pg-btn pg-btn-sm" style={{ marginTop: 8, alignSelf: 'flex-start' }}>
+                Open pipeline <Icon name="arrow-right" size={11} />
+              </a>
             </div>
           </div>
         </section>
 
-        {/* Awaiting client feedback — live polling */}
         <DashboardFeedback />
       </div>
     </div>
@@ -162,13 +189,14 @@ function SectionHead({ title, sub, action }: { title: string; sub?: string; acti
   );
 }
 
-function AttentionRow({ accent, urgency, title, detail, meta, action }: {
+function AttentionRow({ accent, urgency, title, detail, meta, action, href }: {
   accent: 'red' | 'amber' | 'gray';
   urgency: string;
   title: React.ReactNode;
   detail: React.ReactNode;
   meta: string;
   action: string;
+  href: string;
 }) {
   const accentColor = { red: 'var(--pg-red)', amber: 'var(--pg-amber)', gray: 'var(--pg-text-faint)' }[accent];
   return (
@@ -177,13 +205,17 @@ function AttentionRow({ accent, urgency, title, detail, meta, action }: {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 3 }}>
           <span style={{ fontSize: 10.5, color: accentColor, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{urgency}</span>
-          <span style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>·</span>
-          <span style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>{meta}</span>
+          {meta && (
+            <>
+              <span style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>·</span>
+              <span style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>{meta}</span>
+            </>
+          )}
         </div>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--pg-text)' }}>{title}</div>
         <div style={{ fontSize: 12.5, color: 'var(--pg-text-dim)', marginTop: 3 }}>{detail}</div>
       </div>
-      <button className="pg-btn pg-btn-sm" style={{ flexShrink: 0 }}>{action} <Icon name="arrow-right" size={11} /></button>
+      <a href={href} className="pg-btn pg-btn-sm" style={{ flexShrink: 0 }}>{action} <Icon name="arrow-right" size={11} /></a>
     </div>
   );
 }

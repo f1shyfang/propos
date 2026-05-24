@@ -1,18 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { Icon } from '@/components/shared/icon';
+import { InlineAlert } from '@/components/shared/inline-alert';
+import { createDealViaApi, fetchDealForBriefProperty } from '@/lib/create-deal-client';
 
 export function PropertyShortlistActions({ propertyId }: { propertyId: string }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const briefIdParam = searchParams.get('briefId');
   const [briefId, setBriefId] = useState<number | null>(briefIdParam ? Number(briefIdParam) : null);
   const [briefs, setBriefs] = useState<Array<{ id: number; clientName: string; clientUserId: string | null }>>([]);
   const [shortlistId, setShortlistId] = useState<number | null>(null);
   const [sharedAt, setSharedAt] = useState<string | null>(null);
+  const [existingDealId, setExistingDealId] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageVariant, setMessageVariant] = useState<'success' | 'error'>('success');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -35,6 +40,7 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
         setShortlistId(item?.shortlistId ?? null);
         setSharedAt(item?.sharedAt ?? null);
       });
+    fetchDealForBriefProperty(briefId, propertyId).then((d) => setExistingDealId(d?.id ?? null));
   }, [briefId, propertyId]);
 
   async function ensureOnShortlist(): Promise<number | null> {
@@ -57,6 +63,7 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
 
   async function addToShortlist() {
     if (!briefId) {
+      setMessageVariant('error');
       setMessage('Select a buyer brief first');
       return;
     }
@@ -65,8 +72,10 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
     const id = await ensureOnShortlist();
     if (id) {
       setShortlistId(id);
+      setMessageVariant('success');
       setMessage('Added to shortlist');
     } else {
+      setMessageVariant('error');
       setMessage('Could not add to shortlist');
     }
     setBusy(false);
@@ -74,6 +83,7 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
 
   async function shareWithClient() {
     if (!briefId) {
+      setMessageVariant('error');
       setMessage('Select a buyer brief first');
       return;
     }
@@ -81,6 +91,7 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
     setMessage(null);
     const id = await ensureOnShortlist();
     if (!id) {
+      setMessageVariant('error');
       setMessage('Add to shortlist first');
       setBusy(false);
       return;
@@ -93,11 +104,36 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
     const body = await res.json().catch(() => ({}));
     if (res.ok) {
       setSharedAt(new Date().toISOString());
+      setMessageVariant('success');
       setMessage('Shared with client');
     } else {
+      setMessageVariant('error');
       setMessage(body.error ?? 'Could not share');
     }
     setBusy(false);
+  }
+
+  async function handleCreateDeal() {
+    if (!briefId) {
+      setMessageVariant('error');
+      setMessage('Select a buyer brief first');
+      return;
+    }
+    if (existingDealId) {
+      router.push(`/deals/${existingDealId}`);
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    const result = await createDealViaApi({ briefId, propertyId });
+    setBusy(false);
+    if (!result.ok) {
+      setMessageVariant('error');
+      setMessage(result.error);
+      return;
+    }
+    setExistingDealId(result.dealId);
+    router.push(`/deals/${result.dealId}`);
   }
 
   const selectedBrief = briefs.find((b) => b.id === briefId);
@@ -140,15 +176,18 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
           <Icon name="share" size={13} />
           {sharedAt ? 'Shared' : 'Share'}
         </button>
-        <button type="button" className="pg-btn" style={{ justifyContent: 'center' }}>
-          <Icon name="pipeline" size={13} />Create deal
+        <button
+          type="button"
+          className="pg-btn"
+          style={{ justifyContent: 'center' }}
+          disabled={busy}
+          onClick={handleCreateDeal}
+        >
+          <Icon name="pipeline" size={13} />
+          {existingDealId ? 'View deal' : 'Create deal'}
         </button>
       </div>
-      {message && (
-        <p style={{ fontSize: 11, margin: '8px 0 0', color: message.includes('Could') || message.includes('Select') ? 'var(--pg-red)' : 'var(--pg-green)' }}>
-          {message}
-        </p>
-      )}
+      {message && <InlineAlert variant={messageVariant}>{message}</InlineAlert>}
     </div>
   );
 }

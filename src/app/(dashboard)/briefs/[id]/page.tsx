@@ -8,6 +8,7 @@ import { MatchScore } from '@/components/shared/match-score';
 import { PropertyThumb } from '@/components/shared/property-thumb';
 import { ViewToggle, type ViewMode } from '@/components/shared/view-toggle';
 import { BriefMatchesMapView } from '@/components/briefs/brief-matches-map-view';
+import { ShortlistDealButton } from '@/components/deals/shortlist-deal-button';
 import { generateDefaultRoadmap, calcRoadmapDates, type RoadmapMilestone } from '@/lib/roadmap-utils';
 
 interface BriefMatch {
@@ -586,7 +587,7 @@ export default function BriefDetailPage() {
                         padding: '12px 16px', gap: 12, alignItems: 'center', fontSize: 13,
                       }}>
                         <div style={{ width: 52, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
-                          <PropertyThumb imageUrl={p.imageUrl ?? null} size={52} style={{ width: 52, height: 40, borderRadius: 6 }} />
+                          <PropertyThumb imageUrl={p.imageUrl ?? null} height={40} style={{ width: 52, height: 40, borderRadius: 6 }} />
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address}</div>
@@ -601,7 +602,12 @@ export default function BriefDetailPage() {
                             {feedbackLabels[s.feedbackStatus] ?? s.feedbackStatus.replace(/_/g, ' ')}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <ShortlistDealButton
+                            briefId={brief.id}
+                            propertyId={p.id}
+                            feedbackStatus={s.feedbackStatus}
+                          />
                           <a href={`/properties/${p.id}`} className="pg-btn pg-btn-sm">View</a>
                           {!s.sharedAt && brief.clientUserId && (
                             <button type="button" className="pg-btn pg-btn-sm" onClick={() => shareWithClient([s.shortlistId])}>Share</button>

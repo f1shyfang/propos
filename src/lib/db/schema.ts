@@ -267,25 +267,31 @@ export const shortlistsTable = pgTable(
 );
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
-export const dealsTable = pgTable("deals", {
-  id: serial("id").primaryKey(),
-  briefId: integer("brief_id").references(() => buyerBriefsTable.id),
-  propertyId: text("property_id").references(() => propertiesTable.id),
-  status: text("status").default("suggested"),
-  offerSubState: text("offer_sub_state"),
-  offerAmount: integer("offer_amount"),
-  offerConditions: jsonb("offer_conditions").$type<string[]>().default([]),
-  settlementDate: timestamp("settlement_date", { withTimezone: true }),
-  exchangeDate: timestamp("exchange_date", { withTimezone: true }),
-  isAuction: boolean("is_auction").default(false),
-  priority: text("priority").default("standard"),
-  listingAgentName: text("listing_agent_name"),
-  listingAgentPhone: text("listing_agent_phone"),
-  listingAgentEmail: text("listing_agent_email"),
-  strategyNotes: text("strategy_notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+export const dealsTable = pgTable(
+  "deals",
+  {
+    id: serial("id").primaryKey(),
+    briefId: integer("brief_id").references(() => buyerBriefsTable.id),
+    propertyId: text("property_id").references(() => propertiesTable.id),
+    status: text("status").default("suggested"),
+    offerSubState: text("offer_sub_state"),
+    offerAmount: integer("offer_amount"),
+    offerConditions: jsonb("offer_conditions").$type<string[]>().default([]),
+    settlementDate: timestamp("settlement_date", { withTimezone: true }),
+    exchangeDate: timestamp("exchange_date", { withTimezone: true }),
+    isAuction: boolean("is_auction").default(false),
+    priority: text("priority").default("standard"),
+    listingAgentName: text("listing_agent_name"),
+    listingAgentPhone: text("listing_agent_phone"),
+    listingAgentEmail: text("listing_agent_email"),
+    strategyNotes: text("strategy_notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("deals_brief_property_unique").on(table.briefId, table.propertyId),
+  ],
+);
 
 export const dealChecklistItemsTable = pgTable("deal_checklist_items", {
   id: serial("id").primaryKey(),

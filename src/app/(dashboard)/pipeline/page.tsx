@@ -1,10 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+import { useDraggable } from '@dnd-kit/core';
 import { TopBar } from '@/components/shared/top-bar';
 import { Icon } from '@/components/shared/icon';
 import { MatchScore } from '@/components/shared/match-score';
+import { InlineAlert } from '@/components/shared/inline-alert';
 import { getDealStatusLabel, DEAL_STATUSES } from '@/lib/deal-utils';
+import { patchDealStatus } from '@/lib/create-deal-client';
 
 interface LiveDeal {
   id: number; status: string; offerSubState: string | null; offerAmount: number | null;
@@ -25,11 +39,9 @@ const COLUMN_CONFIG: Record<string, { dot?: string; muted?: boolean }> = {
   offer_made: { dot: 'var(--pg-purple)' },
   under_contract: { dot: 'var(--pg-green)' },
   settled: { dot: 'var(--pg-green)', muted: true },
-  lost: { dot: 'var(--pg-red)', muted: true },
-  withdrawn: { muted: true },
 };
 
-const COLUMNS = DEAL_STATUSES.filter(s => !['lost', 'withdrawn'].includes(s));
+const COLUMNS = DEAL_STATUSES.filter((s) => !['lost', 'withdrawn'].includes(s));
 
 function fmt(n: number | null, display: string | null): string {
   if (display) return display;
@@ -47,23 +59,61 @@ function colValue(deals: LiveDeal[]): string {
 export default function PipelinePage() {
   const [deals, setDeals] = useState<LiveDeal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [activeDeal, setActiveDeal] = useState<LiveDeal | null>(null);
 
-  async function load() {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const load = useCallback(async () => {
+    setError(null);
     const res = await fetch('/api/deals');
-    if (res.ok) setDeals((await res.json()).deals ?? []);
+    if (res.ok) {
+      setDeals((await res.json()).deals ?? []);
+    } else {
+      setError('Could not load pipeline. Try refreshing.');
+    }
     setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleDragEnd(event: DragEndEvent) {
+    setActiveDeal(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const dealId = Number(active.id);
+    const newStatus = String(over.id);
+    if (!COLUMNS.includes(newStatus as typeof COLUMNS[number])) return;
+
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal || deal.status === newStatus) return;
+
+    const prev = deals;
+    setDeals((ds) => ds.map((d) => (d.id === dealId ? { ...d, status: newStatus } : d)));
+
+    const ok = await patchDealStatus(dealId, newStatus);
+    if (!ok) {
+      setDeals(prev);
+      setError(`Could not move deal to ${getDealStatusLabel(newStatus)}`);
+    }
   }
 
-  useEffect(() => { load(); }, []);
+  function handleDragStart(event: DragStartEvent) {
+    const deal = deals.find((d) => d.id === Number(event.active.id));
+    setActiveDeal(deal ?? null);
+  }
 
-  const byStatus = DEAL_STATUSES.reduce<Record<string, LiveDeal[]>>((acc, s) => {
-    acc[s] = deals.filter(d => d.status === s);
+  const byStatus = COLUMNS.reduce<Record<string, LiveDeal[]>>((acc, s) => {
+    acc[s] = deals.filter((d) => d.status === s);
     return acc;
   }, {});
 
-  const totalValue = deals.filter(d => !['settled', 'lost', 'withdrawn'].includes(d.status)).reduce((s, d) => s + (d.price ?? d.offerAmount ?? 0), 0);
-  const activeCount = deals.filter(d => !['settled', 'lost', 'withdrawn'].includes(d.status)).length;
+  const totalValue = deals
+    .filter((d) => !['settled', 'lost', 'withdrawn'].includes(d.status))
+    .reduce((s, d) => s + (d.price ?? d.offerAmount ?? 0), 0);
+  const activeCount = deals.filter((d) => !['settled', 'lost', 'withdrawn'].includes(d.status)).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -73,39 +123,85 @@ export default function PipelinePage() {
         actions={
           <>
             <div style={{ display: 'flex', background: 'var(--pg-surface)', border: '1px solid var(--pg-border)', borderRadius: 6, padding: 2 }}>
-              <button className="pg-btn pg-btn-sm pg-btn-ghost" style={{ background: 'var(--pg-bg-2)' }}><Icon name="grid" size={12} />Board</button>
+              <button type="button" className="pg-btn pg-btn-sm pg-btn-ghost" style={{ background: 'var(--pg-bg-2)' }}>
+                <Icon name="grid" size={12} />Board
+              </button>
             </div>
-            <button className="pg-btn pg-btn-primary" onClick={() => setShowNew(true)}><Icon name="plus" size={13} />New deal</button>
+            <button type="button" className="pg-btn pg-btn-primary" onClick={() => setShowNew(true)}>
+              <Icon name="plus" size={13} />New deal
+            </button>
           </>
         }
       />
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 24px' }} className="pg-scroll">
-        <div style={{ display: 'flex', gap: 14, height: '100%', minHeight: 600 }}>
-          {COLUMNS.map(status => {
-            const colDeals = byStatus[status] ?? [];
-            const { dot, muted } = COLUMN_CONFIG[status] ?? {};
-            return (
-              <KCol key={status} title={getDealStatusLabel(status)} count={colDeals.length} value={colValue(colDeals)} dot={dot} muted={muted}>
-                {colDeals.map(d => (
-                  <LiveDealCard key={d.id} deal={d} />
-                ))}
-              </KCol>
-            );
-          })}
+      {error && (
+        <div style={{ padding: '0 24px 8px' }}>
+          <InlineAlert variant="error">{error}</InlineAlert>
         </div>
+      )}
+
+      <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 24px', opacity: loading ? 0.6 : 1 }} className="pg-scroll">
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div style={{ display: 'flex', gap: 14, height: '100%', minHeight: 600 }}>
+            {COLUMNS.map((status) => {
+              const colDeals = byStatus[status] ?? [];
+              const { dot, muted } = COLUMN_CONFIG[status] ?? {};
+              return (
+                <KCol
+                  key={status}
+                  status={status}
+                  title={getDealStatusLabel(status)}
+                  count={colDeals.length}
+                  value={colValue(colDeals)}
+                  dot={dot}
+                  muted={muted}
+                >
+                  {colDeals.map((d) => (
+                    <DraggableDealCard key={d.id} deal={d} />
+                  ))}
+                </KCol>
+              );
+            })}
+          </div>
+          <DragOverlay>
+            {activeDeal ? <DealCardContent deal={activeDeal} dragging /> : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
-      {showNew && <NewDealModal onClose={() => setShowNew(false)} onCreated={() => { load(); setShowNew(false); }} />}
+      {showNew && (
+        <NewDealModal
+          onClose={() => setShowNew(false)}
+          onCreated={() => { load(); setShowNew(false); }}
+        />
+      )}
     </div>
   );
 }
 
-function KCol({ title, count, value, dot, muted, children }: {
-  title: string; count: number; value: string; dot?: string; muted?: boolean; children: React.ReactNode;
+function KCol({
+  status, title, count, value, dot, muted, children,
+}: {
+  status: string;
+  title: string;
+  count: number;
+  value: string;
+  dot?: string;
+  muted?: boolean;
+  children: React.ReactNode;
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+
   return (
-    <div className="pg-kcol" style={{ opacity: muted ? 0.75 : 1 }}>
+    <div
+      ref={setNodeRef}
+      className="pg-kcol"
+      style={{
+        opacity: muted ? 0.75 : 1,
+        outline: isOver ? '2px solid var(--pg-accent)' : 'none',
+        outlineOffset: -2,
+      }}
+    >
       <div style={{ padding: '11px 12px 9px', display: 'flex', alignItems: 'center', gap: 8 }}>
         {dot && <div style={{ width: 6, height: 6, borderRadius: 999, background: dot, flexShrink: 0 }} />}
         <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: '0.02em' }}>{title}</div>
@@ -113,23 +209,47 @@ function KCol({ title, count, value, dot, muted, children }: {
         <div style={{ flex: 1 }} />
         <span className="pg-mono" style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>{value}</span>
       </div>
-      <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto', flex: 1 }} className="pg-scroll">
+      <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto', flex: 1, minHeight: 80 }} className="pg-scroll">
         {children}
       </div>
     </div>
   );
 }
 
-function LiveDealCard({ deal }: { deal: LiveDeal }) {
-  const scoreToMatchPct = (v: number | null) => v == null ? 50 : Math.min(99, Math.max(1, Math.round(v / 100)));
-  const daysToSettlement = deal.settlementDate ? Math.round((new Date(deal.settlementDate).getTime() - Date.now()) / 86400000) : null;
+function DraggableDealCard({ deal }: { deal: LiveDeal }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
+
+  const style = transform
+    ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1 }
+    : { opacity: isDragging ? 0.4 : 1 };
 
   return (
-    <a href={`/deals/${deal.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+      <DealCardContent deal={deal} />
+    </div>
+  );
+}
+
+function DealCardContent({ deal, dragging }: { deal: LiveDeal; dragging?: boolean }) {
+  const scoreToMatchPct = (v: number | null) => (v == null ? 50 : Math.min(99, Math.max(1, Math.round(v / 100))));
+  const daysToSettlement = deal.settlementDate
+    ? Math.round((new Date(deal.settlementDate).getTime() - Date.now()) / 86400000)
+    : null;
+
+  return (
+    <a
+      href={`/deals/${deal.id}`}
+      style={{ textDecoration: 'none', color: 'inherit', display: 'block', pointerEvents: dragging ? 'none' : 'auto' }}
+      onClick={(e) => dragging && e.preventDefault()}
+    >
       <div style={{
-        background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
-        borderRadius: 8, padding: 10, position: 'relative',
-        transition: 'border-color 0.15s',
+        background: 'var(--pg-surface)',
+        border: `1px solid ${dragging ? 'var(--pg-accent)' : 'var(--pg-border)'}`,
+        borderRadius: 8,
+        padding: 10,
+        position: 'relative',
+        cursor: dragging ? 'grabbing' : 'grab',
+        boxShadow: dragging ? '0 8px 24px rgba(0,0,0,0.12)' : 'none',
       }}>
         {deal.priority !== 'standard' && (
           <div style={{ position: 'absolute', top: 8, right: 8, width: 5, height: 5, borderRadius: 999, background: deal.priority === 'urgent' ? 'var(--pg-red)' : 'var(--pg-amber)' }} />
@@ -166,9 +286,10 @@ function NewDealModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
   const [properties, setProperties] = useState<Property[]>([]);
   const [form, setForm] = useState({ briefId: '', propertyId: '', priority: 'standard', isAuction: false, strategyNotes: '' });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([fetch('/api/briefs').then(r => r.json()), fetch('/api/properties').then(r => r.json())]).then(([b, p]) => {
+    Promise.all([fetch('/api/briefs').then((r) => r.json()), fetch('/api/properties').then((r) => r.json())]).then(([b, p]) => {
       setBriefs(b.briefs ?? []);
       setProperties((p.properties ?? []).slice(0, 50));
     });
@@ -177,38 +298,51 @@ function NewDealModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
   async function create() {
     if (!form.briefId || !form.propertyId) return;
     setSaving(true);
-    await fetch('/api/deals', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+    setError(null);
+    const res = await fetch('/api/deals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
     });
+    const body = await res.json().catch(() => ({}));
+    setSaving(false);
+    if (res.status === 409 && body.dealId) {
+      onCreated();
+      return;
+    }
+    if (!res.ok) {
+      setError(body.error ?? 'Could not create deal');
+      return;
+    }
     onCreated();
   }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: 'var(--pg-bg)', borderRadius: 12, padding: '28px 28px', width: 460, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: 'var(--pg-bg)', borderRadius: 12, padding: '28px 28px', width: 460, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
         <h2 className="pg-display" style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>Create deal</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>Client brief</label>
-            <select value={form.briefId} onChange={e => setForm(f => ({ ...f, briefId: e.target.value }))}
-              style={{ width: '100%', padding: '9px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13 }}>
+            <select value={form.briefId} onChange={(e) => setForm((f) => ({ ...f, briefId: e.target.value }))}
+              className="pg-input" style={{ width: '100%', fontSize: 13 }}>
               <option value="">Select brief…</option>
-              {briefs.map(b => <option key={b.id} value={b.id}>{b.clientName}</option>)}
+              {briefs.map((b) => <option key={b.id} value={b.id}>{b.clientName}</option>)}
             </select>
           </div>
           <div>
             <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>Property</label>
-            <select value={form.propertyId} onChange={e => setForm(f => ({ ...f, propertyId: e.target.value }))}
-              style={{ width: '100%', padding: '9px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13 }}>
+            <select value={form.propertyId} onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.value }))}
+              className="pg-input" style={{ width: '100%', fontSize: 13 }}>
               <option value="">Select property…</option>
-              {properties.map(p => <option key={p.id} value={p.id}>{p.address}{p.suburb ? ` — ${p.suburb}` : ''}</option>)}
+              {properties.map((p) => <option key={p.id} value={p.id}>{p.address}{p.suburb ? ` — ${p.suburb}` : ''}</option>)}
             </select>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>Priority</label>
-              <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}
-                style={{ width: '100%', padding: '9px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13 }}>
+              <select value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
+                className="pg-input" style={{ width: '100%', fontSize: 13 }}>
                 <option value="standard">Standard</option>
                 <option value="high">High</option>
                 <option value="urgent">Urgent</option>
@@ -216,20 +350,21 @@ function NewDealModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.isAuction} onChange={e => setForm(f => ({ ...f, isAuction: e.target.checked }))} style={{ accentColor: 'var(--pg-accent)' }} />
+                <input type="checkbox" checked={form.isAuction} onChange={(e) => setForm((f) => ({ ...f, isAuction: e.target.checked }))} style={{ accentColor: 'var(--pg-accent)' }} />
                 Auction property
               </label>
             </div>
           </div>
           <div>
             <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>Strategy notes</label>
-            <textarea value={form.strategyNotes} onChange={e => setForm(f => ({ ...f, strategyNotes: e.target.value }))}
+            <textarea value={form.strategyNotes} onChange={(e) => setForm((f) => ({ ...f, strategyNotes: e.target.value }))}
               rows={2} placeholder="Bidding strategy, walk-away price, notes…"
-              style={{ width: '100%', padding: '9px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13, resize: 'none', boxSizing: 'border-box', fontFamily: 'var(--pg-font-body)' }} />
+              className="pg-input" style={{ width: '100%', fontSize: 13, resize: 'none', boxSizing: 'border-box', fontFamily: 'var(--pg-font-body)' }} />
           </div>
+          {error && <InlineAlert variant="error">{error}</InlineAlert>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
-            <button className="pg-btn" onClick={onClose}>Cancel</button>
-            <button className="pg-btn pg-btn-primary" onClick={create} disabled={saving || !form.briefId || !form.propertyId}>
+            <button type="button" className="pg-btn" onClick={onClose}>Cancel</button>
+            <button type="button" className="pg-btn pg-btn-primary" onClick={create} disabled={saving || !form.briefId || !form.propertyId}>
               {saving ? 'Creating…' : 'Create deal'}
             </button>
           </div>

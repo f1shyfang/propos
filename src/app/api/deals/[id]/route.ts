@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { dealsTable, buyerBriefsTable, propertiesTable, dealChecklistItemsTable, dealMilestonesTable, dealContactsTable, dealDocumentsTable } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { generateSettlementMilestones } from '@/lib/deal-utils';
+import { validateStatusTransition } from '@/lib/deals';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -73,6 +74,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];
   }
+
+  if ('status' in body && body.status) {
+    const [current] = await db.select({ status: dealsTable.status }).from(dealsTable).where(eq(dealsTable.id, dealId));
+    if (!current) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+    if (!validateStatusTransition(current.status ?? 'suggested', body.status)) {
+      return NextResponse.json(
+        { error: `Invalid status transition: ${current.status} → ${body.status}` },
+        { status: 422 },
+      );
+    }
+  }
+
   updates.updatedAt = new Date();
 
   const [updated] = await db.update(dealsTable).set(updates).where(eq(dealsTable.id, dealId)).returning();

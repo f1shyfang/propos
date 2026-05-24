@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Icon } from './icon';
 import { MatchScore } from './match-score';
 import { PropertyThumb } from './property-thumb';
+import { ShortlistDealButton } from '@/components/deals/shortlist-deal-button';
 
-// Shape returned by /api/feedback/poll
 interface FeedbackItem {
   shortlistId: number;
   briefId: number | null;
@@ -40,6 +40,8 @@ const STATUS_LABEL: Record<string, string> = {
   new: 'Awaiting',
 };
 
+const GRID = '2.2fr 1.3fr 0.7fr 0.9fr 1fr 0.7fr 1fr';
+
 function timeAgo(iso: string | null): string {
   if (!iso) return '—';
   const diff = Date.now() - new Date(iso).getTime();
@@ -54,7 +56,6 @@ function timeAgo(iso: string | null): string {
 export function DashboardFeedback() {
   const [rows, setRows] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
-  // Cursor for delta polling — null means fetch all
   const sinceRef = useRef<string | null>(null);
 
   function mergeItems(prev: FeedbackItem[], incoming: FeedbackItem[]): FeedbackItem[] {
@@ -93,13 +94,11 @@ export function DashboardFeedback() {
       .catch(() => setLoading(false));
   }
 
-  // Initial full load
   useEffect(() => {
     fetchFeed(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 3-second delta poll
   useEffect(() => {
     const id = setInterval(() => fetchFeed(false), 3000);
     return () => clearInterval(id);
@@ -107,7 +106,7 @@ export function DashboardFeedback() {
   }, []);
 
   const awaitingCount = rows.filter(
-    (r) => r.feedbackStatus === 'new' || r.feedbackStatus === 'viewed'
+    (r) => r.feedbackStatus === 'new' || r.feedbackStatus === 'viewed',
   ).length;
 
   return (
@@ -141,7 +140,7 @@ export function DashboardFeedback() {
       ) : (
         <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
           <div style={{
-            display: 'grid', gridTemplateColumns: '2.4fr 1.4fr 0.7fr 1fr 1fr 0.8fr',
+            display: 'grid', gridTemplateColumns: GRID,
             padding: '10px 16px',
             borderBottom: '1px solid var(--pg-border)',
             fontSize: 10.5, color: 'var(--pg-text-faint)', letterSpacing: '0.06em',
@@ -153,6 +152,7 @@ export function DashboardFeedback() {
             <span style={{ textAlign: 'right' }}>Price</span>
             <span>Status</span>
             <span style={{ textAlign: 'right' }}>Feedback</span>
+            <span>Action</span>
           </div>
           {rows.map((r, i, a) => {
             const initials = r.clientName
@@ -162,56 +162,61 @@ export function DashboardFeedback() {
               .slice(0, 2)
               .toUpperCase();
             return (
-              <a
+              <div
                 key={r.shortlistId}
-                href={`/properties/${r.property.id}`}
-                style={{ textDecoration: 'none', color: 'inherit' }}
+                className="pg-row"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: GRID,
+                  padding: '12px 16px',
+                  alignItems: 'center',
+                  borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
+                  fontSize: 13,
+                }}
               >
-                <div
-                  className="pg-row"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '2.4fr 1.4fr 0.7fr 1fr 1fr 0.8fr',
-                    padding: '12px 16px',
-                    alignItems: 'center',
-                    borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
-                    fontSize: 13,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                    <PropertyThumb seed={i % 6} height={36} style={{ width: 56, flexShrink: 0, borderRadius: 5 }} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 500 }} className="pg-truncate">
-                        {r.property.address ?? '—'}
-                      </div>
-                      <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>
-                        {r.property.suburb}
-                      </div>
+                <a href={`/properties/${r.property.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                  <PropertyThumb seed={i % 6} height={36} style={{ width: 56, flexShrink: 0, borderRadius: 5 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 500 }} className="pg-truncate">
+                      {r.property.address ?? '—'}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>
+                      {r.property.suburb}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-                    <div className="pg-avatar pg-avatar-sm">{initials}</div>
-                    <span className="pg-truncate">{r.clientName}</span>
-                  </div>
-                  <div>
-                    <MatchScore score={r.property.score} size={28} stroke={2.5} />
-                  </div>
-                  <div style={{ textAlign: 'right', fontFamily: 'var(--pg-font-mono)' }}>
-                    {r.property.price}
-                  </div>
-                  <div>
-                    <span
-                      className={`pg-badge ${STATUS_CLASS[r.feedbackStatus] ?? ''}`}
-                      style={{ fontSize: 11 }}
-                    >
-                      {STATUS_LABEL[r.feedbackStatus] ?? r.feedbackStatus}
-                    </span>
-                  </div>
-                  <div style={{ textAlign: 'right', color: 'var(--pg-text-faint)', fontSize: 12 }}>
-                    {timeAgo(r.feedbackAt)}
-                  </div>
+                </a>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                  <div className="pg-avatar pg-avatar-sm">{initials}</div>
+                  <span className="pg-truncate">{r.clientName}</span>
                 </div>
-              </a>
+                <div>
+                  <MatchScore score={r.property.score} size={28} stroke={2.5} />
+                </div>
+                <div style={{ textAlign: 'right', fontFamily: 'var(--pg-font-mono)' }}>
+                  {r.property.price}
+                </div>
+                <div>
+                  <span
+                    className={`pg-badge ${STATUS_CLASS[r.feedbackStatus] ?? ''}`}
+                    style={{ fontSize: 11 }}
+                  >
+                    {STATUS_LABEL[r.feedbackStatus] ?? r.feedbackStatus}
+                  </span>
+                </div>
+                <div style={{ textAlign: 'right', color: 'var(--pg-text-faint)', fontSize: 12 }}>
+                  {timeAgo(r.feedbackAt)}
+                </div>
+                <div>
+                  {r.briefId && r.feedbackStatus === 'interested' && (
+                    <ShortlistDealButton
+                      briefId={r.briefId}
+                      propertyId={r.property.id}
+                      feedbackStatus={r.feedbackStatus}
+                      size="sm"
+                    />
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>

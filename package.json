@@ -12,9 +12,13 @@
     "test:watch": "vitest",
     "db:push": "npx drizzle-kit push",
     "seed:demo": "tsx scripts/seed-demo-users.ts",
-    "seed:cma": "tsx scripts/seed-cma.ts"
+    "seed:cma": "tsx scripts/seed-cma.ts",
+    "seed:deals": "tsx scripts/seed-deals.ts"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.1",
     "@tanstack/react-query": "^5.100.13",
