@@ -80,6 +80,7 @@ export function DealDocumentPanel({
       const path = allowGenerate === 'offer' ? 'generate-offer' : 'generate-cma';
       const res = await fetch(`/api/deals/${dealId}/documents/${path}`, {
         method: 'POST',
+        credentials: 'include',
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

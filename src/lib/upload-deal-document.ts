@@ -5,6 +5,11 @@ export type UploadDealDocumentOptions = {
   checklistItemId?: number;
 };
 
+async function parseApiError(res: Response, fallback: string): Promise<string> {
+  const data = await res.json().catch(() => ({}));
+  return data.error ?? fallback;
+}
+
 export async function uploadDealDocument(
   dealId: string,
   file: File,
@@ -16,6 +21,7 @@ export async function uploadDealDocument(
 
   const urlRes = await fetch(`/api/deals/${dealId}/documents/upload-url`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       filename: file.name,
@@ -27,8 +33,7 @@ export async function uploadDealDocument(
   });
 
   if (!urlRes.ok) {
-    const data = await urlRes.json().catch(() => ({}));
-    throw new Error(data.error ?? 'Could not start upload');
+    throw new Error(await parseApiError(urlRes, 'Could not start upload'));
   }
 
   const { documentId, uploadUrl } = await urlRes.json();
@@ -42,12 +47,12 @@ export async function uploadDealDocument(
 
   const completeRes = await fetch(`/api/deals/${dealId}/documents/complete`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ documentId }),
   });
   if (!completeRes.ok) {
-    const data = await completeRes.json().catch(() => ({}));
-    throw new Error(data.error ?? 'Could not confirm upload');
+    throw new Error(await parseApiError(completeRes, 'Could not confirm upload'));
   }
 }
 

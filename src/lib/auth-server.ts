@@ -1,25 +1,51 @@
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { auth, getUserRole, type UserRole } from "@/lib/auth";
+import { type UserRole } from "@/lib/auth";
 
-export type AppSession = NonNullable<Awaited<ReturnType<typeof getSession>>>;
+/** Auth disabled — server routes always run as this demo agent. */
+const DEMO_SESSION = {
+  session: {
+    id: "demo-session",
+    userId: "demo-agent",
+    expiresAt: new Date("2099-01-01"),
+    token: "demo",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ipAddress: null as string | null,
+    userAgent: null as string | null,
+  },
+  user: {
+    id: "demo-agent",
+    name: "Demo Agent",
+    email: "agent@demo.com",
+    emailVerified: true,
+    image: null as string | null,
+    organization: "Buyer's agency",
+    role: "agent",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+};
+
+export type AppSession = typeof DEMO_SESSION;
+
+function demoSession(): AppSession {
+  return {
+    session: { ...DEMO_SESSION.session },
+    user: { ...DEMO_SESSION.user },
+  };
+}
 
 export async function getSession() {
-  return auth.api.getSession({ headers: await headers() });
+  return demoSession();
 }
 
 export async function requireSession() {
-  const session = await getSession();
-  if (!session) return null;
-  return session;
+  return demoSession();
 }
 
-export async function requireRole(role: UserRole) {
-  const session = await requireSession();
-  if (!session) return null;
-  if (getUserRole(session.user) !== role) return null;
-  return session;
+export async function requireRole(_role: UserRole) {
+  return demoSession();
 }
 
 export function unauthorizedResponse() {

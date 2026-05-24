@@ -71,7 +71,10 @@ export function DealDocumentActions({
     setError(null);
     try {
       const path = kind === 'offer' ? 'generate-offer' : 'generate-cma';
-      const res = await fetch(`/api/deals/${dealId}/documents/${path}`, { method: 'POST' });
+      const res = await fetch(`/api/deals/${dealId}/documents/${path}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? `Could not generate ${kind} PDF`);

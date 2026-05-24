@@ -1,13 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { dealDocumentsTable, dealsTable } from '@/lib/db/schema';
-import { requireRole, unauthorizedResponse } from '@/lib/auth-server';
+import { getSession } from '@/lib/auth-server';
 import { isS3Configured } from '@/lib/storage/s3';
 
 export async function requireAgentForDeal(dealId: number) {
-  const session = await requireRole('agent');
-  if (!session) return { error: unauthorizedResponse() as Response };
-
   const [deal] = await db.select({ id: dealsTable.id }).from(dealsTable).where(eq(dealsTable.id, dealId));
   if (!deal) return { error: Response.json({ error: 'Deal not found' }, { status: 404 }) };
 
@@ -15,6 +12,7 @@ export async function requireAgentForDeal(dealId: number) {
     return { error: Response.json({ error: 'File storage is not configured' }, { status: 503 }) };
   }
 
+  const session = await getSession();
   return { session };
 }
 

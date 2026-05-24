@@ -67,7 +67,7 @@ export function SignupForm({ error: initialError }: { error?: string }) {
 
       <p className="text-sm text-gray-600">
         Already have an account?{" "}
-        <Link href="/dashboard" className="underline">
+        <Link href="/login" className="underline">
           Sign in
         </Link>
       </p>
