@@ -5,10 +5,10 @@ Next.js (App Router, TypeScript, Tailwind v4) + Supabase — unified workspace f
 ## Setup
 
 1. Create a project at [supabase.com](https://supabase.com) and grab the API URL + anon key from **Project Settings → API**.
-2. Fill in `.env.local`:
+2. Copy `.env.local.example` to `.env.local` and fill in:
    ```
-   NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+   DATABASE_URL=postgresql://...
+   OPENAI_API_KEY=sk-...   # required for audio/text intake at /briefs/intake
    ```
 3. Install and run:
    ```bash

@@ -200,6 +200,19 @@ export const buyerBriefsTable = pgTable("buyer_briefs", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// ── Intake transcriptions (audio/text → parsed brief audit trail) ─────────────
+export const intakeTranscriptionsTable = pgTable("intake_transcriptions", {
+  id: serial("id").primaryKey(),
+  agentId: text("agent_id"),
+  source: text("source").notNull(), // "audio" | "text"
+  originalFilename: text("original_filename"),
+  rawTranscript: text("raw_transcript").notNull(),
+  parsedJson: jsonb("parsed_json").$type<Record<string, unknown>>(),
+  briefId: integer("brief_id").references(() => buyerBriefsTable.id),
+  status: text("status").notNull().default("parsed"), // "parsed" | "saved" | "failed"
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
 // ── Shortlists ────────────────────────────────────────────────────────────────
 export const shortlistsTable = pgTable("shortlists", {
   id: serial("id").primaryKey(),
