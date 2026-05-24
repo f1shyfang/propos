@@ -6,6 +6,8 @@ import { useQueryState } from 'nuqs';
 import { Icon } from '@/components/shared/icon';
 import { MatchScore } from '@/components/shared/match-score';
 import { PropertyThumb } from '@/components/shared/property-thumb';
+import { ViewToggle, type ViewMode } from '@/components/shared/view-toggle';
+import { BriefMatchesMapView } from '@/components/briefs/brief-matches-map-view';
 import { generateDefaultRoadmap, calcRoadmapDates, type RoadmapMilestone } from '@/lib/roadmap-utils';
 
 interface BriefMatch {
@@ -13,6 +15,7 @@ interface BriefMatch {
   price: string; propertyType: string | null; bedrooms: number | null;
   bathrooms: number | null; parkingSpaces: number | null; days: number | null;
   score: number; overallScore: number; underOffer: boolean; imageUrl: string | null; href: string;
+  lat: number | null; lng: number | null;
 }
 
 interface ShortlistItem {
@@ -91,6 +94,11 @@ type Tab = 'matches' | 'shortlist' | 'roadmap' | 'profile';
 export default function BriefDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useQueryState<Tab>('tab', { defaultValue: 'matches', parse: (v) => ((['matches','shortlist','roadmap','profile'] as const).includes(v as Tab) ? v as Tab : 'matches'), shallow: true });
+  const [view, setView] = useQueryState<ViewMode>('view', {
+    defaultValue: 'table',
+    parse: (v) => (v === 'map' || v === 'split' ? 'split' : 'table'),
+    shallow: true,
+  });
   const [brief, setBrief] = useState<Brief | null>(null);
   const [shortlist, setShortlist] = useState<ShortlistItem[]>([]);
   const [matches, setMatches] = useState<BriefMatch[]>([]);
@@ -129,11 +137,12 @@ export default function BriefDetailPage() {
     setLoading(false);
   }, [id]);
 
-  const loadMatches = useCallback(async (offset: number, replace = false, customFilter?: FilterState) => {
+  const loadMatches = useCallback(async (offset: number, replace = false, customFilter?: FilterState, all = false) => {
     setMatchesLoading(true);
     const f = customFilter ?? filterRef.current;
     const params = f ? filterToParams(f) : new URLSearchParams();
     params.set('offset', String(offset));
+    if (all) params.set('all', '1');
     const res = await fetch(`/api/briefs/${id}/matches?${params}`);
     if (res.ok) {
       const data = await res.json();
@@ -153,6 +162,12 @@ export default function BriefDetailPage() {
       .then(d => { if (d?.suburbs) setSuburbSuggestions(d.suburbs); });
   }, [loadBrief, loadMatches]);
 
+  useEffect(() => {
+    if (view === 'split' && tab === 'matches' && matchTotal != null && matches.length < matchTotal && !matchesLoading) {
+      loadMatches(0, true, undefined, true);
+    }
+  }, [view, tab, matchTotal, matches.length, matchesLoading, loadMatches]);
+
   async function reloadBrief() {
     const res = await fetch(`/api/briefs/${id}`);
     if (res.ok) {
@@ -169,7 +184,7 @@ export default function BriefDetailPage() {
     setFilter(filterDraft);
     setMatches([]);
     setMatchTotal(null);
-    await loadMatches(0, true, filterDraft);
+    await loadMatches(0, true, filterDraft, view === 'split');
     setApplyingFilter(false);
   }
 
@@ -208,7 +223,7 @@ export default function BriefDetailPage() {
     setSavingFilter(false);
     setMatches([]);
     setMatchTotal(null);
-    loadMatches(0, true, filterDraft);
+    loadMatches(0, true, filterDraft, view === 'split');
   }
 
   async function toggleShortlist(propertyId: string) {
@@ -288,7 +303,7 @@ export default function BriefDetailPage() {
   if (loading) return <div style={{ padding: 40, color: 'var(--pg-text-dim)' }}>Loading…</div>;
   if (!brief) return <div style={{ padding: 40, color: 'var(--pg-red)' }}>Brief not found.</div>;
 
-  const shortlistedIds = new Set(shortlist.map(s => s.property?.id).filter(Boolean));
+  const shortlistedIds = new Set(shortlist.map(s => s.property?.id).filter((id): id is string => Boolean(id)));
   const fmt = (n: number | null) => n ? (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${(n / 1000).toFixed(0)}K`) : '—';
 
   return (
@@ -345,31 +360,50 @@ export default function BriefDetailPage() {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '24px 32px' }} className="pg-scroll">
+      <div style={{
+        flex: 1,
+        overflow: tab === 'matches' && view === 'split' ? 'hidden' : 'auto',
+        padding: tab === 'matches' && view === 'split' ? 0 : '24px 32px',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+      }} className={tab === 'matches' && view === 'split' ? undefined : 'pg-scroll'}>
         {tab === 'matches' && (
           <>
-            {/* Active filter chips */}
-            {filter && (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
-                {filter.suburbs.split(',').filter(s => s.trim()).map(s => (
-                  <span key={s} className="pg-badge" style={{ fontSize: 11 }}>{s.trim()}</span>
-                ))}
-                {filter.propertyTypes.split(',').filter(s => s.trim()).map(s => (
-                  <span key={s} className="pg-badge" style={{ fontSize: 11 }}>{s.trim()}</span>
-                ))}
-                {filter.budgetMax && (
-                  <span className="pg-badge" style={{ fontSize: 11 }}>
-                    up to {parseInt(filter.budgetMax) >= 1_000_000
-                      ? `$${(parseInt(filter.budgetMax) / 1_000_000).toFixed(1)}M`
-                      : `$${(parseInt(filter.budgetMax) / 1000).toFixed(0)}K`}
-                  </span>
+            {(filter || matches.length > 0) && (
+              <div style={{
+                display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center',
+                marginBottom: view === 'split' ? 0 : 16,
+                padding: view === 'split' ? '16px 24px' : undefined,
+                borderBottom: view === 'split' ? '1px solid var(--pg-border)' : undefined,
+              }}>
+                {filter && (
+                  <>
+                    {filter.suburbs.split(',').filter(s => s.trim()).map(s => (
+                      <span key={s} className="pg-badge" style={{ fontSize: 11 }}>{s.trim()}</span>
+                    ))}
+                    {filter.propertyTypes.split(',').filter(s => s.trim()).map(s => (
+                      <span key={s} className="pg-badge" style={{ fontSize: 11 }}>{s.trim()}</span>
+                    ))}
+                    {filter.budgetMax && (
+                      <span className="pg-badge" style={{ fontSize: 11 }}>
+                        up to {parseInt(filter.budgetMax) >= 1_000_000
+                          ? `$${(parseInt(filter.budgetMax) / 1_000_000).toFixed(1)}M`
+                          : `$${(parseInt(filter.budgetMax) / 1000).toFixed(0)}K`}
+                      </span>
+                    )}
+                    {filter.minBeds && filter.minBeds !== '0' && (
+                      <span className="pg-badge" style={{ fontSize: 11 }}>{filter.minBeds}+ beds</span>
+                    )}
+                    <button className="pg-btn pg-btn-sm" style={{ marginLeft: 4 }} onClick={() => setTab('profile')}>
+                      <Icon name="sliders" size={11} />Edit profile
+                    </button>
+                  </>
                 )}
-                {filter.minBeds && filter.minBeds !== '0' && (
-                  <span className="pg-badge" style={{ fontSize: 11 }}>{filter.minBeds}+ beds</span>
+                <div style={{ flex: 1 }} />
+                {matches.length > 0 && (
+                  <ViewToggle value={view} onChange={setView} />
                 )}
-                <button className="pg-btn pg-btn-sm" style={{ marginLeft: 4 }} onClick={() => setTab('profile')}>
-                  <Icon name="sliders" size={11} />Edit profile
-                </button>
               </div>
             )}
 
@@ -383,6 +417,35 @@ export default function BriefDetailPage() {
                 <div style={{ fontSize: 15, marginTop: 14, fontWeight: 500 }}>No matches yet</div>
                 <div style={{ fontSize: 13, marginTop: 6 }}>Adjust the client profile or add suburbs to find matching properties.</div>
               </div>
+            ) : view === 'split' ? (
+              <BriefMatchesMapView
+                matches={matches.map(m => ({
+                  id: m.id,
+                  lat: m.lat,
+                  lng: m.lng,
+                  address: m.address,
+                  suburb: m.suburb,
+                  state: m.state,
+                  price: m.price,
+                  score: m.score,
+                  underOffer: m.underOffer,
+                  href: m.href,
+                  bedrooms: m.bedrooms,
+                  bathrooms: m.bathrooms,
+                  parkingSpaces: m.parkingSpaces,
+                  propertyType: m.propertyType,
+                  imageUrl: m.imageUrl,
+                }))}
+                shortlistedIds={shortlistedIds}
+                compareIds={compareIds}
+                shortlisting={shortlisting}
+                onToggleCompare={toggleCompare}
+                onToggleShortlist={toggleShortlist}
+                loading={matchesLoading}
+                total={matchTotal}
+                hasMore={hasMore}
+                onLoadMore={() => loadMatches(matchesOffsetRef.current, false, undefined, true)}
+              />
             ) : (
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }} className="pg-card-flat">

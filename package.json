@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:push": "npx drizzle-kit push",
-    "seed:demo": "tsx scripts/seed-demo-users.ts"
+    "seed:demo": "tsx scripts/seed-demo-users.ts",
+    "seed:cma": "tsx scripts/seed-cma.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

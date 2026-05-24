@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { buyerBriefsTable, propertiesTable } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { formatPrice, scoreToMatchPct } from '@/lib/utils';
+import { normalizePropertyCoords } from '@/lib/geo-utils';
 import {
   briefRowToCriteria,
   buildPropertyMatchConditions,
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const sp = req.nextUrl.searchParams;
   const offset = parseInt(sp.get('offset') ?? '0', 10) || 0;
+  const all = sp.get('all') === '1';
 
   const [brief] = await db.select().from(buyerBriefsTable).where(eq(buyerBriefsTable.id, briefId));
   if (!brief) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -35,10 +37,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const whereClause = buildPropertyMatchConditions(criteria);
   const candidates = await db.select().from(propertiesTable).where(whereClause);
   const allRanked = scoreAndRankProperties(candidates, criteria, candidates.length);
-  const page = allRanked.slice(offset, offset + PAGE_SIZE);
   const total = allRanked.length;
+  const pageSize = all ? total : PAGE_SIZE;
+  const page = allRanked.slice(offset, offset + pageSize);
 
-  const matches = page.map(({ row: p, matchScore }) => ({
+  const matches = page.map(({ row: p, matchScore }) => {
+    const coords = normalizePropertyCoords(p.latitude, p.longitude);
+    return {
     id: p.id,
     address: p.address,
     suburb: p.suburb,
@@ -55,7 +60,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     underOffer: !!p.underOffer,
     imageUrl: (p.images as string[] | null)?.[0] ?? null,
     href: `/properties/${p.id}`,
-  }));
+    lat: coords?.lat ?? null,
+    lng: coords?.lng ?? null,
+  };
+  });
 
-  return NextResponse.json({ matches, total, offset, hasMore: offset + PAGE_SIZE < total });
+  return NextResponse.json({ matches, total, offset, hasMore: all ? false : offset + pageSize < total });
 }

@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, real, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, real, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ── Better Auth tables ────────────────────────────────────────────────────────
@@ -133,6 +133,28 @@ export const propertiesTable = pgTable("properties", {
   images: jsonb("images").$type<string[]>().default([]),
 });
 
+// ── CMA Records (comparable sales per subject property — see docs/DATA-MODEL.md §1d)
+export const cmaRecordsTable = pgTable(
+  "cma_records",
+  {
+    id: serial("id").primaryKey(),
+    propertyId: text("property_id")
+      .notNull()
+      .references(() => propertiesTable.id, { onDelete: "cascade" }),
+    comparableAddress: text("comparable_address"),
+    salePrice: integer("sale_price"),
+    saleDate: timestamp("sale_date", { withTimezone: true }),
+    bedrooms: integer("bedrooms"),
+    bathrooms: integer("bathrooms"),
+    landSizeSqm: integer("land_size_sqm"),
+    pricePerSqm: real("price_per_sqm"),
+    distanceKm: real("distance_km"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [index("cma_records_property_id_idx").on(table.propertyId)],
+);
+
 // ── Relations ─────────────────────────────────────────────────────────────────
 
 export const lgasRelations = relations(lgasTable, ({ many }) => ({
@@ -171,6 +193,14 @@ export const propertiesRelations = relations(propertiesTable, ({ one, many }) =>
     references: [suburbsTable.suburbId],
   }),
   shortlists: many(shortlistsTable),
+  cmaRecords: many(cmaRecordsTable),
+}));
+
+export const cmaRecordsRelations = relations(cmaRecordsTable, ({ one }) => ({
+  property: one(propertiesTable, {
+    fields: [cmaRecordsTable.propertyId],
+    references: [propertiesTable.id],
+  }),
 }));
 
 // ── Buyer Briefs ──────────────────────────────────────────────────────────────

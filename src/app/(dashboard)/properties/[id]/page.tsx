@@ -1,12 +1,13 @@
 import { Suspense } from 'react';
 import { db } from '@/lib/db';
-import { propertiesTable, suburbsTable } from '@/lib/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { cmaRecordsTable, propertiesTable, suburbsTable } from '@/lib/db/schema';
+import { desc, eq, sql } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import { PropertyThumb } from '@/components/shared/property-thumb';
 import { MatchScore } from '@/components/shared/match-score';
 import { PropertyShortlistActions } from '@/components/shortlists/property-shortlist-actions';
+import { calculatePricePerSqm } from '@/lib/cma-utils';
 
 function scoreToMatchPct(overall: number | null): number {
   if (!overall) return 50;
@@ -24,6 +25,11 @@ function calcStampDuty(price: number | null): string {
   if (!price) return '—';
   const duty = price * 0.05;
   return `$${duty.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
+}
+
+function formatSaleDate(date: Date | null): string {
+  if (!date) return '—';
+  return date.toLocaleDateString('en-AU', { month: 'short', year: 'numeric' });
 }
 
 const NSW_BASE = 'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services';
@@ -112,6 +118,12 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
     }));
   }
   const risk = await fetchRiskOverlay(trueLat ?? 0, trueLng ?? 0, p.state);
+
+  const cmaRows = await db.select()
+    .from(cmaRecordsTable)
+    .where(eq(cmaRecordsTable.propertyId, p.id))
+    .orderBy(desc(cmaRecordsTable.saleDate))
+    .limit(6);
 
   const price = formatPrice(p.price, p.priceDisplay);
 
@@ -294,7 +306,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               </div>
             )}
 
-            {/* CMA table — static demo */}
+            {/* CMA table */}
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>
                 <h3 className="pg-display" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Recent comparable sales</h3>
@@ -302,22 +314,31 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 <div style={{ flex: 1 }} />
               </div>
               <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
-                {[
-                  { addr: 'Comparable 1', date: 'Recent', sold: p.appraisedValue ? formatPrice(Math.round(p.appraisedValue * 1.02), null) : '—', bbc: `${p.bedrooms}·${p.bathrooms}·${p.parkingSpaces ?? 1}`, sqm: p.landSize ? `${Math.round(p.landSize * 0.95)}m²` : '—', comp: 96 },
-                  { addr: 'Comparable 2', date: 'Recent', sold: p.appraisedValue ? formatPrice(Math.round(p.appraisedValue * 0.97), null) : '—', bbc: `${p.bedrooms}·${p.bathrooms}·${p.parkingSpaces ?? 1}`, sqm: p.landSize ? `${Math.round(p.landSize * 0.88)}m²` : '—', comp: 88 },
-                  { addr: 'Comparable 3', date: 'Older', sold: p.appraisedValue ? formatPrice(Math.round(p.appraisedValue * 1.05), null) : '—', bbc: `${p.bedrooms}·${p.bathrooms}·${(p.parkingSpaces ?? 0) + 1}`, sqm: p.landSize ? `${Math.round(p.landSize * 1.07)}m²` : '—', comp: 80 },
-                ].map((c, i, a) => (
-                  <div key={i} className="pg-row" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 0.8fr', padding: '12px 16px', alignItems: 'center', fontSize: 13, borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none' }}>
-                    <div style={{ fontWeight: 500 }}>{c.addr}</div>
-                    <div style={{ color: 'var(--pg-text-dim)', fontSize: 12 }}>{c.date}</div>
-                    <div className="pg-mono">{c.sold}</div>
-                    <div style={{ color: 'var(--pg-text-dim)' }}>{c.bbc}</div>
-                    <div style={{ color: 'var(--pg-text-dim)', fontSize: 12 }}>{c.sqm}</div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span className="pg-mono" style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>{c.comp}% comp</span>
+                {cmaRows.length ? cmaRows.map((c, i, a) => {
+                  const pricePerSqm = c.pricePerSqm ?? calculatePricePerSqm(c.salePrice, c.landSizeSqm);
+                  const bedBathCar = [c.bedrooms, c.bathrooms, p.parkingSpaces]
+                    .map(v => v ?? '—')
+                    .join('·');
+
+                  return (
+                    <div key={c.id} className="pg-row" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 0.8fr', padding: '12px 16px', alignItems: 'center', fontSize: 13, borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none' }}>
+                      <div style={{ fontWeight: 500 }}>{c.comparableAddress ?? 'Comparable'}</div>
+                      <div style={{ color: 'var(--pg-text-dim)', fontSize: 12 }}>{formatSaleDate(c.saleDate)}</div>
+                      <div className="pg-mono">{c.salePrice ? formatPrice(c.salePrice, null) : '—'}</div>
+                      <div style={{ color: 'var(--pg-text-dim)' }}>{bedBathCar}</div>
+                      <div style={{ color: 'var(--pg-text-dim)', fontSize: 12 }}>{c.landSizeSqm ? `${c.landSizeSqm}m²` : '—'}</div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span className="pg-mono" style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>
+                          {pricePerSqm ? `$${pricePerSqm.toLocaleString('en-AU')}/m²` : '—'}
+                        </span>
+                      </div>
                     </div>
+                  );
+                }) : (
+                  <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--pg-text-dim)' }}>
+                    No comparable sales available.
                   </div>
-                ))}
+                )}
               </div>
               {p.appraisedValue && (
                 <div style={{ marginTop: 14, padding: '14px 16px', background: 'var(--pg-bg-2)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 16 }}>

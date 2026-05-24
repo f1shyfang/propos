@@ -4,6 +4,7 @@ import { readFileSync, createReadStream } from "fs";
 import { createInterface } from "readline";
 import { resolve } from "path";
 import * as schema from "../src/lib/db/schema";
+import { seedCmaRecords } from "../src/lib/seed/cma-seed";
 
 const db = drizzle(process.env.DATABASE_URL!, { schema });
 
@@ -158,12 +159,21 @@ if (batch.length > 0) {
 }
 console.log(`\r  → ${propCount.toLocaleString()} properties (${propsDropped.toLocaleString()} dropped, suburb_id not found)`);
 
+
+// ── 5. CMA Records (demo comparables — see src/lib/seed/cma-seed.ts) ─────────
+console.log("Inserting CMA records...");
+const { subjects: cmaSubjects, records: cmaRecordCount } = await seedCmaRecords(db, {
+  clearExisting: true,
+});
+console.log(`  → ${cmaRecordCount} CMA records for ${cmaSubjects} properties`);
+
 // ── Summary ───────────────────────────────────────────────────────────────────
-const [lgaCount, suburbCount, schoolCount, propTotal] = await Promise.all([
+const [lgaCount, suburbCount, schoolCount, propTotal, cmaCount] = await Promise.all([
   db.select({ n: sql<number>`count(*)` }).from(schema.lgasTable),
   db.select({ n: sql<number>`count(*)` }).from(schema.suburbsTable),
   db.select({ n: sql<number>`count(*)` }).from(schema.schoolsTable),
   db.select({ n: sql<number>`count(*)` }).from(schema.propertiesTable),
+  db.select({ n: sql<number>`count(*)` }).from(schema.cmaRecordsTable),
 ]);
 
 console.log("\nDone!");
@@ -172,4 +182,5 @@ console.table({
   suburbs: Number(suburbCount[0].n),
   schools: Number(schoolCount[0].n),
   properties: Number(propTotal[0].n),
+  cma_records: Number(cmaCount[0].n),
 });
