@@ -10,7 +10,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:push": "npx drizzle-kit push"
+    "db:push": "npx drizzle-kit push",
+    "seed:demo": "tsx scripts/seed-demo-users.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

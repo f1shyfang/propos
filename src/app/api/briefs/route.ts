@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { buyerBriefsTable } from '@/lib/db/schema';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
+import { user } from '@/lib/db/schema';
 import { logAction } from '@/lib/log-action';
 
 export async function GET() {
@@ -22,9 +23,17 @@ export async function POST(req: NextRequest) {
   if (!clientName?.trim()) return NextResponse.json({ error: 'clientName required' }, { status: 400 });
   if (!email?.trim()) return NextResponse.json({ error: 'email required' }, { status: 400 });
 
+  const normalizedEmail = email.trim().toLowerCase();
+  const [clientUser] = await db
+    .select({ id: user.id, role: user.role })
+    .from(user)
+    .where(eq(user.email, normalizedEmail))
+    .limit(1);
+
   const [brief] = await db.insert(buyerBriefsTable).values({
     clientName: clientName.trim(),
-    email: email.trim(),
+    email: normalizedEmail,
+    clientUserId: clientUser?.role === 'client' ? clientUser.id : null,
     phone: phone?.trim() ?? '',
     contactMethod,
     engagementType,

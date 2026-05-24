@@ -62,7 +62,8 @@ type IconName =
   | "volume"
   | "volume-x"
   | "pause"
-  | "play";
+  | "play"
+  | "rotate-cw";
 
 interface IconProps {
   name: IconName;
@@ -374,6 +375,12 @@ const paths: Record<IconName, React.ReactNode> = {
   play: (
     <>
       <polygon points="5 3 19 12 5 21 5 3" />
+    </>
+  ),
+  "rotate-cw": (
+    <>
+      <path d="M21 2v6h-6" />
+      <path d="M21 13a9 9 0 11-3-7.7L21 8" />
     </>
   ),
 };

@@ -1,20 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { shortlistsTable } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { shortlistsTable, buyerBriefsTable } from '@/lib/db/schema';
+import { eq, and, isNotNull } from 'drizzle-orm';
 import { logAction } from '@/lib/log-action';
+import { requireRole, unauthorizedResponse, forbiddenResponse } from '@/lib/auth-server';
+import { validateClientFeedbackStatus } from '@/lib/feedback-utils';
+
+async function clientOwnsShortlist(shortlistId: number, clientUserId: string) {
+  const [row] = await db
+    .select({ s: shortlistsTable, b: buyerBriefsTable })
+    .from(shortlistsTable)
+    .innerJoin(buyerBriefsTable, eq(shortlistsTable.briefId, buyerBriefsTable.id))
+    .where(
+      and(
+        eq(shortlistsTable.id, shortlistId),
+        eq(buyerBriefsTable.clientUserId, clientUserId),
+        isNotNull(shortlistsTable.sharedAt),
+      ),
+    );
+  return row ?? null;
+}
 
 export async function POST(req: NextRequest) {
+  const session = await requireRole('client');
+  if (!session) return unauthorizedResponse();
+
   const { shortlistId, feedbackStatus, feedbackText, feedbackReason } = await req.json();
 
   if (!shortlistId) return NextResponse.json({ error: 'shortlistId required' }, { status: 400 });
 
-  const validStatuses = ['new', 'viewed', 'interested', 'need_more_info', 'not_for_me'];
-  if (!validStatuses.includes(feedbackStatus)) {
+  if (!validateClientFeedbackStatus(feedbackStatus)) {
     return NextResponse.json({ error: 'Invalid feedbackStatus' }, { status: 400 });
   }
 
-  const [updated] = await db.update(shortlistsTable)
+  const owned = await clientOwnsShortlist(Number(shortlistId), session.user.id);
+  if (!owned) return forbiddenResponse();
+
+  const [updated] = await db
+    .update(shortlistsTable)
     .set({
       feedbackStatus,
       feedbackText: feedbackText ?? null,
@@ -24,17 +47,29 @@ export async function POST(req: NextRequest) {
     .where(eq(shortlistsTable.id, Number(shortlistId)))
     .returning();
 
-  if (!updated) return NextResponse.json({ error: 'Shortlist item not found' }, { status: 404 });
+  logAction({
+    userId: session.user.id,
+    actionType: 'feedback_submit',
+    entityType: 'shortlist',
+    entityId: String(shortlistId),
+    metadata: { feedbackStatus },
+  });
 
-  logAction({ userId: 'client', actionType: 'feedback_submit', entityType: 'shortlist', entityId: String(shortlistId), metadata: { feedbackStatus } });
   return NextResponse.json({ shortlist: updated });
 }
 
 export async function GET(req: NextRequest) {
+  const session = await requireRole('agent');
+  if (!session) return unauthorizedResponse();
+
   const sp = req.nextUrl.searchParams;
-  const briefId = parseInt(sp.get('briefId') ?? '');
+  const briefId = parseInt(sp.get('briefId') ?? '', 10);
   if (isNaN(briefId)) return NextResponse.json({ error: 'briefId required' }, { status: 400 });
 
-  const items = await db.select().from(shortlistsTable).where(eq(shortlistsTable.briefId, briefId));
+  const items = await db
+    .select()
+    .from(shortlistsTable)
+    .where(eq(shortlistsTable.briefId, briefId));
+
   return NextResponse.json({ items });
 }

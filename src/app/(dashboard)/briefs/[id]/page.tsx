@@ -16,15 +16,15 @@ interface BriefMatch {
 
 interface ShortlistItem {
   shortlistId: number; status: string; feedbackStatus: string;
-  feedbackText: string | null; agentNote: string | null;
+  feedbackText: string | null; agentNote: string | null; sharedAt: string | null;
   property: { id: string; address: string; suburb: string | null; price: string; score: number } | null;
 }
 
 interface Brief {
-  id: number; clientName: string; email: string; budgetMin: number | null;
-  budgetMax: number | null; suburbs: string[]; propertyTypes: string[];
-  mustHaves: string[]; dealBreakers: string[]; minBeds: number | null;
-  minBaths: number | null; status: string | null;
+  id: number; clientName: string; email: string; clientUserId: string | null;
+  budgetMin: number | null; budgetMax: number | null; suburbs: string[];
+  propertyTypes: string[]; mustHaves: string[]; dealBreakers: string[];
+  minBeds: number | null; minBaths: number | null; status: string | null;
 }
 
 type Tab = 'matches' | 'shortlist' | 'roadmap';
@@ -35,6 +35,10 @@ export default function BriefDetailPage() {
   const [data, setData] = useState<{ brief: Brief; matches: BriefMatch[]; shortlist: ShortlistItem[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [shortlisting, setShortlisting] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [linkEmail, setLinkEmail] = useState('');
+  const [linking, setLinking] = useState(false);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [roadmap, setRoadmap] = useState<RoadmapMilestone[] | null>(null);
 
@@ -47,14 +51,62 @@ export default function BriefDetailPage() {
   useEffect(() => { load(); }, [load]);
 
   async function toggleShortlist(propertyId: string) {
+    if (!data) return;
     setShortlisting(propertyId);
-    await fetch('/api/shortlists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ briefId: id, propertyId }),
-    });
+    const inList = data.shortlist.some((s) => s.property?.id === propertyId);
+    const item = data.shortlist.find((s) => s.property?.id === propertyId);
+    if (inList && item) {
+      await fetch(`/api/shortlists/${item.shortlistId}`, { method: 'DELETE' });
+    } else {
+      await fetch('/api/shortlists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ briefId: id, propertyId }),
+      });
+    }
     await load();
     setShortlisting(null);
+  }
+
+  async function shareWithClient(shortlistIds?: number[]) {
+    setSharing(true);
+    setShareMessage(null);
+    const res = await fetch('/api/shortlists/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ briefId: id, shortlistIds }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setShareMessage(`Shared ${body.sharedCount} propert${body.sharedCount === 1 ? 'y' : 'ies'} with client`);
+      await load();
+    } else {
+      setShareMessage(body.error ?? 'Could not share');
+    }
+    setSharing(false);
+  }
+
+  async function linkClient() {
+    setLinking(true);
+    setShareMessage(null);
+    const res = await fetch(`/api/briefs/${id}/link-client`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: linkEmail || data?.brief.email }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setShareMessage('Client linked to this brief');
+      await load();
+    } else {
+      setShareMessage(body.error ?? 'Could not link client');
+    }
+    setLinking(false);
+  }
+
+  async function removeShortlist(shortlistId: number) {
+    await fetch(`/api/shortlists/${shortlistId}`, { method: 'DELETE' });
+    await load();
   }
 
   function toggleCompare(propertyId: string) {
@@ -177,6 +229,36 @@ export default function BriefDetailPage() {
 
         {tab === 'shortlist' && (
           <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="pg-btn pg-btn-accent"
+                disabled={sharing || shortlist.length === 0 || !brief.clientUserId}
+                onClick={() => shareWithClient()}
+              >
+                <Icon name="share" size={13} />
+                {sharing ? 'Sharing…' : 'Share with client'}
+              </button>
+              {!brief.clientUserId && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1, minWidth: 280 }}>
+                  <input
+                    className="pg-input"
+                    style={{ flex: 1, fontSize: 13 }}
+                    placeholder={brief.email}
+                    value={linkEmail}
+                    onChange={(e) => setLinkEmail(e.target.value)}
+                  />
+                  <button type="button" className="pg-btn pg-btn-sm" disabled={linking} onClick={linkClient}>
+                    {linking ? 'Linking…' : 'Link client'}
+                  </button>
+                </div>
+              )}
+              {shareMessage && (
+                <span style={{ fontSize: 12, color: shareMessage.includes('Could') || shareMessage.includes('no linked') ? 'var(--pg-red)' : 'var(--pg-green)' }}>
+                  {shareMessage}
+                </span>
+              )}
+            </div>
             {shortlist.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--pg-text-dim)' }}>
                 <Icon name="bookmark" size={36} color="var(--pg-text-very-faint)" />
@@ -194,10 +276,10 @@ export default function BriefDetailPage() {
                   };
                   return (
                     <div key={s.shortlistId} style={{
-                      display: 'grid', gridTemplateColumns: '2.5fr 0.8fr 0.8fr 1fr',
+                      display: 'grid', gridTemplateColumns: '2.5fr 0.7fr 0.9fr 0.9fr 1.2fr',
                       padding: '14px 16px', alignItems: 'center', fontSize: 13,
                       borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
-                      gap: 16,
+                      gap: 12,
                     }}>
                       <div>
                         <div style={{ fontWeight: 500 }}>{p.address}</div>
@@ -210,12 +292,25 @@ export default function BriefDetailPage() {
                       </div>
                       <div className="pg-mono" style={{ fontSize: 12 }}>{p.price}</div>
                       <div>
+                        <span className={`pg-badge ${s.sharedAt ? 'pg-badge-blue' : ''}`} style={{ fontSize: 10 }}>
+                          {s.sharedAt ? 'Shared' : 'Draft'}
+                        </span>
+                      </div>
+                      <div>
                         <span className={`pg-badge ${statusColors[s.feedbackStatus] ?? ''}`} style={{ fontSize: 11 }}>
                           {s.feedbackStatus.replace(/_/g, ' ')}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <a href={`/properties/${p.id}`} className="pg-btn pg-btn-sm">View</a>
+                        {!s.sharedAt && brief.clientUserId && (
+                          <button type="button" className="pg-btn pg-btn-sm" onClick={() => shareWithClient([s.shortlistId])}>
+                            Share
+                          </button>
+                        )}
+                        <button type="button" className="pg-btn pg-btn-sm pg-btn-ghost" onClick={() => removeShortlist(s.shortlistId)}>
+                          Remove
+                        </button>
                       </div>
                     </div>
                   );

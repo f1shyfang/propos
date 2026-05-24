@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, real, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, real, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ── Better Auth tables ────────────────────────────────────────────────────────
@@ -9,6 +9,7 @@ export const user = pgTable("user", {
   emailVerified: boolean("email_verified").notNull(),
   image: text("image"),
   organization: text("organization"),
+  role: text("role").notNull().default("agent"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
 });
@@ -176,6 +177,7 @@ export const propertiesRelations = relations(propertiesTable, ({ one, many }) =>
 export const buyerBriefsTable = pgTable("buyer_briefs", {
   id: serial("id").primaryKey(),
   agentId: text("agent_id"),
+  clientUserId: text("client_user_id").references(() => user.id),
   clientName: text("client_name").notNull(),
   email: text("email").notNull(),
   phone: text("phone").notNull(),
@@ -214,19 +216,25 @@ export const intakeTranscriptionsTable = pgTable("intake_transcriptions", {
 });
 
 // ── Shortlists ────────────────────────────────────────────────────────────────
-export const shortlistsTable = pgTable("shortlists", {
-  id: serial("id").primaryKey(),
-  briefId: integer("brief_id").references(() => buyerBriefsTable.id),
-  propertyId: text("property_id").references(() => propertiesTable.id),
-  agentNote: text("agent_note"),
-  status: text("status").default("shortlisted"),
-  feedbackStatus: text("feedback_status").default("new"),
-  feedbackText: text("feedback_text"),
-  feedbackReason: text("feedback_reason"),
-  sharedAt: timestamp("shared_at", { withTimezone: true }),
-  feedbackAt: timestamp("feedback_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
+export const shortlistsTable = pgTable(
+  "shortlists",
+  {
+    id: serial("id").primaryKey(),
+    briefId: integer("brief_id").references(() => buyerBriefsTable.id),
+    propertyId: text("property_id").references(() => propertiesTable.id),
+    agentNote: text("agent_note"),
+    status: text("status").default("shortlisted"),
+    feedbackStatus: text("feedback_status").default("new"),
+    feedbackText: text("feedback_text"),
+    feedbackReason: text("feedback_reason"),
+    sharedAt: timestamp("shared_at", { withTimezone: true }),
+    feedbackAt: timestamp("feedback_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("shortlists_brief_property_unique").on(table.briefId, table.propertyId),
+  ],
+);
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
 export const dealsTable = pgTable("deals", {

@@ -24,8 +24,20 @@ export const auth = betterAuth({
         defaultValue: "",
         fieldName: "organization",
       },
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "agent",
+        fieldName: "role",
+      },
     },
   },
 });
+
+export type UserRole = "agent" | "client";
+
+export function getUserRole(user: { role?: string | null }): UserRole {
+  return user.role === "client" ? "client" : "agent";
+}
 
 export type Session = typeof auth.$Infer.Session;

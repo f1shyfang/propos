@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import { Icon } from '@/components/shared/icon';
 import { PropertyThumb } from '@/components/shared/property-thumb';
@@ -62,22 +63,35 @@ const statusLabel: Record<string, string> = {
 
 export default function ClientPortalPage() {
   const [items, setItems] = useState<ShortlistItem[]>([]);
+  const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [urlInput, setUrlInput] = useState('');
 
   const load = useCallback(async () => {
-    const res = await fetch('/api/portal/shortlists');
-    if (res.ok) {
-      const data = await res.json();
-      setItems(data.items);
+    const [portalRes, meRes] = await Promise.all([
+      fetch('/api/portal/shortlists'),
+      fetch('/api/me'),
+    ]);
+    if (portalRes.ok) {
+      const data = await portalRes.json();
+      setItems(data.items ?? []);
+    }
+    if (meRes.ok) {
+      const me = await meRes.json();
+      setUserName(me.name?.split(' ')[0] ?? me.name);
     }
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
+  }, [load]);
 
-  const properties = items.filter(it => it.property).slice(0, 6);
+  const properties = items.filter((it) => it.property);
   const hasShortlist = properties.length > 0;
+  const firstName = userName ?? 'there';
 
   return (
     <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 32px 64px' }}>
@@ -89,7 +103,7 @@ export default function ClientPortalPage() {
             {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}
           </div>
           <h1 className="pg-display" style={{ margin: 0, fontSize: 36, fontWeight: 500, letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-            Welcome back, Sarah.
+            Welcome back, {firstName}.
           </h1>
           <p style={{ margin: '12px 0 0', fontSize: 14, color: 'var(--pg-text-dim)', maxWidth: 560, lineHeight: 1.55 }}>
             {hasShortlist
@@ -185,11 +199,15 @@ export default function ClientPortalPage() {
             const fbLabel = statusLabel[item.feedbackStatus] ?? item.feedbackStatus;
             return (
               <div key={item.shortlistId} className="pg-card" style={{ display: 'flex', flexDirection: 'column' }}>
-                <PropertyThumb seed={i} height={180} />
+                <Link href={`/portal/properties/${p.id}?shortlistId=${item.shortlistId}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <PropertyThumb seed={i} height={180} />
+                </Link>
                 <div style={{ padding: 16, flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 500 }} className="pg-truncate">{p.address}</div>
+                      <Link href={`/portal/properties/${p.id}?shortlistId=${item.shortlistId}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                        <div style={{ fontSize: 14, fontWeight: 500 }} className="pg-truncate">{p.address}</div>
+                      </Link>
                       <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>{p.suburb}, {p.state}</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
@@ -229,6 +247,14 @@ export default function ClientPortalPage() {
                   )}
 
                   <div style={{ flex: 1 }} />
+
+                  <Link
+                    href={`/portal/properties/${p.id}?shortlistId=${item.shortlistId}`}
+                    className="pg-btn pg-btn-sm"
+                    style={{ marginBottom: 10, justifyContent: 'center' }}
+                  >
+                    View &amp; give feedback
+                  </Link>
 
                   <FeedbackButtons
                     shortlistId={item.shortlistId}
