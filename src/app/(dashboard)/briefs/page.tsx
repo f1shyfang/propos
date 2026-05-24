@@ -22,9 +22,14 @@ export default async function BriefsPage() {
         eyebrow={`${briefs.length} active brief${briefs.length !== 1 ? 's' : ''}`}
         title="Buyer Briefs"
         actions={
-          <a href="/briefs/new" className="pg-btn pg-btn-accent">
-            <Icon name="plus" size={13} />New brief
-          </a>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <a href="/briefs/intake" className="pg-btn">
+              <Icon name="mic" size={13} />Import from recording
+            </a>
+            <a href="/briefs/new" className="pg-btn pg-btn-accent">
+              <Icon name="plus" size={13} />New brief
+            </a>
+          </div>
         }
       />
 
@@ -34,9 +39,14 @@ export default async function BriefsPage() {
             <Icon name="users" size={40} color="var(--pg-text-very-faint)" />
             <div style={{ fontSize: 16, marginTop: 16, fontWeight: 500 }}>No briefs yet</div>
             <div style={{ fontSize: 13, marginTop: 6, color: 'var(--pg-text-faint)' }}>Create your first buyer brief to start matching properties.</div>
-            <a href="/briefs/new" className="pg-btn pg-btn-accent" style={{ display: 'inline-flex', marginTop: 20 }}>
-              <Icon name="plus" size={13} />New brief
-            </a>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 20 }}>
+              <a href="/briefs/intake" className="pg-btn" style={{ display: 'inline-flex' }}>
+                <Icon name="mic" size={13} />Import from recording
+              </a>
+              <a href="/briefs/new" className="pg-btn pg-btn-accent" style={{ display: 'inline-flex' }}>
+                <Icon name="plus" size={13} />New brief
+              </a>
+            </div>
           </div>
         ) : (
           <div className="pg-card-flat" style={{ overflow: 'hidden' }}>

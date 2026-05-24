@@ -4,61 +4,20 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import { validateStep1, validateStep2, validateStep3, validateStep4 } from '@/lib/brief-validation';
+import {
+  BRIEF_STEPS,
+  DEAL_BREAKER_OPTIONS,
+  EMPTY_BRIEF_FORM,
+  MUST_HAVE_OPTIONS,
+  PROPERTY_TYPES,
+  SYDNEY_SUBURBS,
+} from '@/lib/brief-field-options';
 
-const STEPS = [
-  'Client Info',
-  'Budget & Finance',
-  'Property Requirements',
-  'Location',
-  'Must-Haves',
-  'Strategy',
-];
+const STEPS = [...BRIEF_STEPS];
 
-const PROPERTY_TYPES = ['House', 'Apartment', 'Townhouse', 'Villa Unit', 'Duplex', 'Acreage', 'Vacant Land'];
-const MUST_HAVE_OPTIONS = [
-  { id: 'natural_light', label: 'Natural light' },
-  { id: 'near_transport', label: 'Near public transport' },
-  { id: 'internal_laundry', label: 'Internal laundry' },
-  { id: 'garage', label: 'Garage / off-street parking' },
-  { id: 'north_facing', label: 'North-facing aspect' },
-  { id: 'backyard', label: 'Backyard / outdoor area' },
-  { id: 'school_zone', label: 'School catchment zone' },
-  { id: 'granny_flat', label: 'Granny flat potential' },
-];
-const DEAL_BREAKER_OPTIONS = [
-  { id: 'ground_floor', label: 'Ground floor' },
-  { id: 'main_road', label: 'Main road frontage' },
-  { id: 'no_balcony', label: 'No balcony (apartment)' },
-  { id: 'cladding', label: 'Cladding issues' },
-  { id: 'high_strata', label: 'High strata fees' },
-  { id: 'west_facing', label: 'West-facing living areas' },
-];
-const SYDNEY_SUBURBS = [
-  'Surry Hills', 'Newtown', 'Pyrmont', 'Redfern', 'Darlinghurst',
-  'Paddington', 'Glebe', 'Rozelle', 'Marrickville', 'Randwick',
-  'Lane Cove', 'Mosman', 'Manly', 'Parramatta', 'Homebush',
-  'Ryde', 'Canterbury', 'Liverpool', 'Dulwich Hill', 'Caulfield',
-  'Hawthorn', 'Richmond', 'Fitzroy', 'Collingwood', 'South Yarra',
-];
+type BriefForm = typeof EMPTY_BRIEF_FORM & { suburbInput: string };
 
-type BriefForm = {
-  clientName: string; email: string; phone: string; contactMethod: string;
-  engagementType: string;
-  preApprovalStatus: string; budgetMin: string; budgetMax: string; buyerType: string;
-  propertyTypes: string[]; minBeds: number; minBaths: number; parking: string;
-  suburbs: string[]; suburbInput: string;
-  mustHaves: string[]; dealBreakers: string[];
-  urgency: string; purchasePurpose: string; auctionWillingness: boolean;
-};
-
-const initial: BriefForm = {
-  clientName: '', email: '', phone: '', contactMethod: 'email', engagementType: 'full-service',
-  preApprovalStatus: 'Not Started', budgetMin: '', budgetMax: '', buyerType: 'owner-occupier',
-  propertyTypes: [], minBeds: 2, minBaths: 1, parking: 'nice_to_have',
-  suburbs: [], suburbInput: '',
-  mustHaves: [], dealBreakers: [],
-  urgency: '3 months', purchasePurpose: 'PPOR', auctionWillingness: true,
-};
+const initial: BriefForm = { ...EMPTY_BRIEF_FORM, suburbInput: '' };
 
 export default function NewBriefPage() {
   const router = useRouter();
