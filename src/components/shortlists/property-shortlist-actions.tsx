@@ -71,7 +71,7 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
   async function addToShortlist() {
     if (!briefId) {
       setMessageVariant('error');
-      setMessage('Select a buyer brief first');
+      setMessage('Select a client first');
       return;
     }
     setBusy(true);
@@ -91,7 +91,7 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
   async function shareWithClient() {
     if (!briefId) {
       setMessageVariant('error');
-      setMessage('Select a buyer brief first');
+      setMessage('Select a client first');
       return;
     }
     setBusy(true);
@@ -123,7 +123,7 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
   async function handleCreateDeal() {
     if (!briefId) {
       setMessageVariant('error');
-      setMessage('Select a buyer brief first');
+      setMessage('Select a client first');
       return;
     }
     if (existingDealId) {
@@ -149,7 +149,7 @@ export function PropertyShortlistActions({ propertyId }: { propertyId: string })
     <div className="pg-card" style={{ padding: 18 }}>
       {briefs.length > 1 && (
         <label style={{ display: 'block', fontSize: 12, color: 'var(--pg-text-dim)', marginBottom: 8 }}>
-          Buyer brief
+          Clients
           <select
             className="pg-input"
             style={{ width: '100%', marginTop: 4, fontSize: 13 }}

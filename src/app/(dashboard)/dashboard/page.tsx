@@ -79,7 +79,7 @@ export default async function DashboardPage() {
         title="Good morning."
         actions={
           <>
-            <a href="/briefs/new" className="pg-btn"><Icon name="plus" size={13} />Add brief</a>
+            <a href="/briefs/new" className="pg-btn"><Icon name="plus" size={13} />Add client</a>
             <a href="/pipeline" className="pg-btn pg-btn-primary">
               <Icon name="pipeline" size={13} />
               {pipeline.activeCount} in pipeline

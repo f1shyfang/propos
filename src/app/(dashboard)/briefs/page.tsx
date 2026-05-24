@@ -22,6 +22,8 @@ export default async function BriefsPage() {
     id: b.id,
     clientName: b.clientName,
     email: b.email,
+    phone: b.phone,
+    agent: 'Jess Morgan',
     budgetMin: b.budgetMin,
     budgetMax: b.budgetMax,
     suburbs: ((b.suburbs as string[]) ?? []).map(cleanSuburb),
@@ -34,14 +36,14 @@ export default async function BriefsPage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <TopBar
         eyebrow={`${rows.length} active brief${rows.length !== 1 ? 's' : ''}`}
-        title="Buyer Briefs"
+        title="Clients"
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
             <Link href="/briefs/intake" className="pg-btn">
               <Icon name="mic" size={13} />Import from recording
             </Link>
             <Link href="/briefs/new" className="pg-btn pg-btn-accent">
-              <Icon name="plus" size={13} />New brief
+              <Icon name="plus" size={13} />New client
             </Link>
           </div>
         }

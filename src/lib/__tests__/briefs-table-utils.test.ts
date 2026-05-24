@@ -6,7 +6,11 @@ import {
   getDisplayBriefRows,
   isTestNoiseBrief,
   paginateBriefRows,
+  reorderColumnKeys,
+  resizeColumnWidth,
+  rowsToCsv,
   sortBriefRows,
+  sortBriefRowsMulti,
   type BriefTableRow,
 } from '../briefs-table-utils';
 
@@ -79,6 +83,38 @@ describe('briefs table utilities', () => {
     ]);
     expect(sortBriefRows(rows, { key: 'budget', direction: 'desc' }).map((r) => r.id)).toEqual([2, 1, 3]);
     expect(sortBriefRows(rows, { key: 'created', direction: 'asc' }).map((r) => r.id)).toEqual([3, 2, 1]);
+  });
+
+  it('sorts by multiple columns in priority order', () => {
+    const result = sortBriefRowsMulti(
+      [
+        { ...rows[0], id: 10, status: 'searching', budgetMax: 900000 },
+        { ...rows[1], id: 11, status: 'searching', budgetMax: 1300000 },
+        { ...rows[2], id: 12, status: 'paused', budgetMax: 2000000 },
+      ],
+      [
+        { key: 'status', direction: 'asc' },
+        { key: 'budget', direction: 'desc' },
+      ],
+    );
+
+    expect(result.map((r) => r.id)).toEqual([12, 11, 10]);
+  });
+
+  it('reorders column keys with drag indexes', () => {
+    expect(reorderColumnKeys(['budget', 'suburbs', 'status'], 'status', 'budget')).toEqual(['status', 'budget', 'suburbs']);
+  });
+
+  it('clamps resized column widths', () => {
+    expect(resizeColumnWidth(180, -200, 120, 360)).toBe(120);
+    expect(resizeColumnWidth(180, 260, 120, 360)).toBe(360);
+    expect(resizeColumnWidth(180, 40, 120, 360)).toBe(220);
+  });
+
+  it('exports rows to csv with escaped values', () => {
+    const csv = rowsToCsv([rows[0]], ['client', 'email', 'budget', 'suburbs']);
+    expect(csv.split('\n')[0]).toBe('Client,Email,Budget,Suburbs');
+    expect(csv.split('\n')[1]).toContain('Sarah & Tom,sarah@example.com,$800K - $1.1M,"Surry Hills, Newtown"');
   });
 
   it('paginates rows and reports ranges', () => {
