@@ -13,6 +13,7 @@ import {
   URGENCY_OPTIONS,
   type BriefFormPayload,
 } from '@/lib/brief-field-options';
+import { normalizePropertyType } from '@/lib/property-type-utils';
 
 const llmBriefSchema = z.object({
   clientName: z.string().nullable().optional(),
@@ -71,21 +72,6 @@ function pickEnum<T extends readonly string[]>(value: string | null | undefined,
   if (match) return match;
   const partial = allowed.find((item) => lower.includes(item.toLowerCase()) || item.toLowerCase().includes(lower));
   return partial ?? fallback;
-}
-
-function normalizePropertyType(type: string): string | null {
-  const lower = type.toLowerCase().trim();
-  for (const allowed of PROPERTY_TYPES) {
-    if (allowed.toLowerCase() === lower) return allowed;
-  }
-  if (lower.includes('unit') || lower.includes('villa')) return 'Villa Unit';
-  if (lower.includes('apartment') || lower.includes('flat')) return 'Apartment';
-  if (lower.includes('townhouse') || lower.includes('town house')) return 'Townhouse';
-  if (lower.includes('house')) return 'House';
-  if (lower.includes('duplex')) return 'Duplex';
-  if (lower.includes('acreage')) return 'Acreage';
-  if (lower.includes('land')) return 'Vacant Land';
-  return null;
 }
 
 function normalizeSuburb(name: string): string {
