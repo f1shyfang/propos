@@ -15,6 +15,7 @@ export type PipelineDeal = {
   offerAmount: number | null;
   priority: string;
   isAuction: boolean;
+  listingAgentName: string | null;
   exchangeDate: string | null;
   settlementDate: string | null;
   clientName: string | null;
@@ -58,14 +59,18 @@ export async function createDeal(input: CreateDealInput) {
 }
 
 export async function patchDealStatus(dealId: number, status: string) {
+  return patchDeal(dealId, { status });
+}
+
+export async function patchDeal(dealId: number, patch: Record<string, unknown>) {
   const res = await fetch(`/api/deals/${dealId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(patch),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? 'Could not update deal status');
+    throw new Error(body.error ?? 'Could not update deal');
   }
-  return true;
+  return res.json();
 }

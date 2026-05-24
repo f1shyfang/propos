@@ -17,6 +17,7 @@ const dealSelect = {
   offerAmount: dealsTable.offerAmount,
   priority: dealsTable.priority,
   isAuction: dealsTable.isAuction,
+  listingAgentName: dealsTable.listingAgentName,
   exchangeDate: dealsTable.exchangeDate,
   settlementDate: dealsTable.settlementDate,
   createdAt: dealsTable.createdAt,
@@ -67,7 +68,12 @@ export async function GET(req: NextRequest) {
           .orderBy(desc(dealOfferEventsTable.createdAt))
       : [];
 
-  const recentByDeal = groupRecentOfferEventsByDeal(offerEventRows);
+  const recentByDeal = groupRecentOfferEventsByDeal(
+    offerEventRows.map((event) => ({
+      ...event,
+      createdAt: event.createdAt ?? new Date(),
+    })),
+  );
 
   const dealsWithHistory = deals.map((deal) => ({
     ...deal,

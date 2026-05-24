@@ -324,11 +324,34 @@ body {
   border-radius: 8px;
   box-shadow: 0 18px 44px rgba(20,18,12,0.13);
 }
+.pipeline-popover-sm {
+  min-width: 180px;
+}
 .pipeline-popover label {
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--pg-text-dim);
+  font-size: 12px;
+}
+.pipeline-popover a,
+.pipeline-popover button {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  color: var(--pg-text);
+  text-decoration: none;
+}
+.pipeline-popover a:hover,
+.pipeline-popover button:hover {
+  background: var(--pg-bg-2);
+}
+.pipeline-popover select.pg-input {
+  margin-left: auto;
+  width: 130px;
+  padding: 4px 7px;
   font-size: 12px;
 }
 .pipeline-col-head {
@@ -360,6 +383,19 @@ body {
   box-shadow: 0 6px 18px rgba(20,18,12,0.07);
   transform: translateY(-1px);
 }
+.pipeline-card-drag {
+  width: 16px;
+  height: 22px;
+  flex: 0 0 16px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--pg-text-very-faint);
+  font: 700 12px/1 var(--pg-font-mono);
+  letter-spacing: -4px;
+  cursor: grab;
+}
+.pipeline-card-drag:active { cursor: grabbing; }
 .pipeline-table-shell {
   background: var(--pg-surface);
   border: 1px solid var(--pg-border);
@@ -392,6 +428,21 @@ body {
 .pipeline-table th svg {
   margin-left: 5px;
   vertical-align: middle;
+}
+.pipeline-th-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.pipeline-th-btn:hover {
+  color: var(--pg-text);
 }
 .pipeline-table th i {
   position: absolute;

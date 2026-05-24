@@ -24,12 +24,14 @@ import { fetchBriefs, fetchBriefMatchesAll, type BriefMatchItem } from '@/lib/qu
 import {
   createDeal,
   fetchDeals,
+  patchDeal,
   patchDealStatus,
   type PipelineDeal,
 } from '@/lib/queries/deals';
 import { OfferHistoryInline } from '@/components/deals/offer-history-timeline';
 
 type ViewMode = 'board' | 'list';
+type SortMode = 'created_desc' | 'value_desc' | 'score_desc' | 'activity_asc';
 
 type DisplayDeal = PipelineDeal & {
   agentName: string;
@@ -79,6 +81,9 @@ const STAGE_BADGE: Record<string, string> = {
   settled: 'pg-badge-green',
 };
 
+const TABLE_COLUMNS = ['Client', 'Stage', 'Price/Value', 'Agent', 'Score', 'Created Date', 'Last Activity'] as const;
+type TableColumn = typeof TABLE_COLUMNS[number];
+
 function fmt(n: number | null, display: string | null): string {
   if (display) return display;
   if (!n) return '—';
@@ -122,7 +127,7 @@ function withDisplayData(deal: PipelineDeal): DisplayDeal {
   const [fallbackSuburb, fallbackState] = fallbackLocation.split(', ');
   return {
     ...deal,
-    agentName: AGENTS[deal.id % AGENTS.length],
+    agentName: isPlaceholder(deal.listingAgentName) ? AGENTS[deal.id % AGENTS.length] : deal.listingAgentName!,
     cleanClientName: isPlaceholder(deal.clientName) ? CLIENTS[deal.id % CLIENTS.length] : deal.clientName!,
     displayAddress: isPlaceholder(deal.address) ? fallbackAddress : deal.address!,
     displaySuburb: [isPlaceholder(deal.suburb) ? fallbackSuburb : deal.suburb, deal.state || fallbackState].filter(Boolean).join(', '),
@@ -143,6 +148,13 @@ export default function PipelinePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showViews, setShowViews] = useState(false);
   const [showColumns, setShowColumns] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('created_desc');
+  const [stageFilter, setStageFilter] = useState<string>('all');
+  const [agentFilter, setAgentFilter] = useState<string>('all');
+  const [highValueOnly, setHighValueOnly] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<TableColumn[]>([...TABLE_COLUMNS]);
+  const [activeCardMenuId, setActiveCardMenuId] = useState<number | null>(null);
+  const [activeColumnMenu, setActiveColumnMenu] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -155,16 +167,28 @@ export default function PipelinePage() {
   const deals = displayDeals;
   const filteredDeals = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return deals;
-    return deals.filter((deal) => [
-      deal.displayAddress,
-      deal.displaySuburb,
-      deal.cleanClientName,
-      deal.agentName,
-      getDealStatusLabel(deal.status),
-      deal.valueLabel,
-    ].some((value) => value.toLowerCase().includes(q)));
-  }, [deals, query]);
+    const filtered = deals.filter((deal) => {
+      const matchesQuery = !q || [
+        deal.displayAddress,
+        deal.displaySuburb,
+        deal.cleanClientName,
+        deal.agentName,
+        getDealStatusLabel(deal.status),
+        deal.valueLabel,
+      ].some((value) => value.toLowerCase().includes(q));
+      const matchesStage = stageFilter === 'all' || deal.status === stageFilter;
+      const matchesAgent = agentFilter === 'all' || deal.agentName === agentFilter;
+      const matchesValue = !highValueOnly || (deal.price ?? deal.offerAmount ?? 0) >= 1_500_000;
+      return matchesQuery && matchesStage && matchesAgent && matchesValue;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (sortMode === 'value_desc') return (b.price ?? b.offerAmount ?? 0) - (a.price ?? a.offerAmount ?? 0);
+      if (sortMode === 'score_desc') return b.scorePct - a.scorePct;
+      if (sortMode === 'activity_asc') return a.lastActivity.localeCompare(b.lastActivity);
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [agentFilter, deals, highValueOnly, query, sortMode, stageFilter]);
 
   const statusMutation = useMutation({
     mutationFn: ({ dealId, status }: { dealId: number; status: string }) =>
@@ -187,6 +211,72 @@ export default function PipelinePage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.deals.all });
     },
   });
+
+  const dealPatchMutation = useMutation({
+    mutationFn: ({ dealId, patch }: { dealId: number; patch: Record<string, unknown> }) =>
+      patchDeal(dealId, patch),
+    onMutate: async ({ dealId, patch }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.deals.all });
+      const previous = queryClient.getQueryData<{ deals: PipelineDeal[] }>(queryKeys.deals.all);
+      queryClient.setQueryData<{ deals: PipelineDeal[] }>(queryKeys.deals.all, (old) => ({
+        deals: (old?.deals ?? []).map((d) => (d.id === dealId ? { ...d, ...patch } : d)),
+      }));
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.deals.all, context.previous);
+      }
+      setError(err instanceof Error ? err.message : 'Could not update deal');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.deals.all });
+    },
+  });
+
+  function moveDeal(dealId: number, status: string) {
+    setError(null);
+    setActiveCardMenuId(null);
+    statusMutation.mutate({ dealId, status });
+  }
+
+  function bulkMove(status: string) {
+    setError(null);
+    selectedIds.forEach((dealId) => statusMutation.mutate({ dealId, status }));
+    setSelectedIds([]);
+  }
+
+  function bulkAssignAgent(agentName: string) {
+    setError(null);
+    selectedIds.forEach((dealId) => dealPatchMutation.mutate({ dealId, patch: { listingAgentName: agentName } }));
+    setSelectedIds([]);
+  }
+
+  function exportDealsCsv() {
+    const rows: Record<string, string>[] = filteredDeals.map((deal) => ({
+      Address: deal.displayAddress,
+      Location: deal.displaySuburb,
+      Client: deal.cleanClientName,
+      Stage: getDealStatusLabel(deal.status),
+      Value: deal.valueLabel,
+      Agent: deal.agentName,
+      Score: `${deal.scorePct}%`,
+      Created: dateLabel(deal.createdAt),
+      'Last Activity': deal.lastActivity,
+    }));
+    const header = ['Address', 'Location', 'Client', 'Stage', 'Value', 'Agent', 'Score', 'Created', 'Last Activity'];
+    const csv = [
+      header.join(','),
+      ...rows.map((row) => header.map((key) => `"${String(row[key] ?? '').replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'pipeline-deals.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveDeal(null);
@@ -252,6 +342,21 @@ export default function PipelinePage() {
         setShowViews={setShowViews}
         showColumns={showColumns}
         setShowColumns={setShowColumns}
+        sortMode={sortMode}
+        setSortMode={setSortMode}
+        stageFilter={stageFilter}
+        setStageFilter={setStageFilter}
+        agentFilter={agentFilter}
+        setAgentFilter={setAgentFilter}
+        highValueOnly={highValueOnly}
+        setHighValueOnly={setHighValueOnly}
+        visibleColumns={visibleColumns}
+        setVisibleColumns={setVisibleColumns}
+        availableAgents={Array.from(new Set(deals.map((deal) => deal.agentName)))}
+        onBulkMove={bulkMove}
+        onBulkAssignAgent={bulkAssignAgent}
+        onArchiveSelected={() => bulkMove('lost')}
+        onExport={exportDealsCsv}
       />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 24px', opacity: loading ? 0.6 : 1 }} className="pg-scroll">
@@ -271,11 +376,17 @@ export default function PipelinePage() {
                     dot={dot}
                     muted={muted}
                     allSelected={colDeals.length > 0 && colDeals.every((d) => selectedIds.includes(d.id))}
+                    menuOpen={activeColumnMenu === status}
+                    onToggleMenu={() => setActiveColumnMenu((current) => current === status ? null : status)}
                     onToggleAll={(checked) => {
                       const ids = colDeals.map((d) => d.id);
                       setSelectedIds((current) => checked
                         ? Array.from(new Set([...current, ...ids]))
                         : current.filter((id) => !ids.includes(id)));
+                    }}
+                    onSortByScore={() => {
+                      setSortMode('score_desc');
+                      setActiveColumnMenu(null);
                     }}
                   >
                     {colDeals.map((d) => (
@@ -284,6 +395,9 @@ export default function PipelinePage() {
                         deal={d}
                         selected={selectedIds.includes(d.id)}
                         onSelect={(checked) => setSelectedIds((current) => checked ? [...current, d.id] : current.filter((id) => id !== d.id))}
+                        menuOpen={activeCardMenuId === d.id}
+                        onToggleMenu={() => setActiveCardMenuId((current) => current === d.id ? null : d.id)}
+                        onMove={moveDeal}
                       />
                     ))}
                   </KCol>
@@ -299,6 +413,11 @@ export default function PipelinePage() {
             deals={filteredDeals}
             selectedIds={selectedIds}
             setSelectedIds={setSelectedIds}
+            visibleColumns={visibleColumns}
+            onSort={setSortMode}
+            activeMenuId={activeCardMenuId}
+            onToggleMenu={(dealId) => setActiveCardMenuId((current) => current === dealId ? null : dealId)}
+            onMove={moveDeal}
           />
         )}
       </div>
@@ -317,7 +436,7 @@ export default function PipelinePage() {
 }
 
 function KCol({
-  status, title, count, value, dot, muted, allSelected, onToggleAll, children,
+  status, title, count, value, dot, muted, allSelected, menuOpen, onToggleAll, onToggleMenu, onSortByScore, children,
 }: {
   status: string;
   title: string;
@@ -326,7 +445,10 @@ function KCol({
   dot?: string;
   muted?: boolean;
   allSelected: boolean;
+  menuOpen: boolean;
   onToggleAll: (checked: boolean) => void;
+  onToggleMenu: () => void;
+  onSortByScore: () => void;
   children: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
@@ -342,16 +464,25 @@ function KCol({
       }}
     >
       <div className="pipeline-col-head">
-        <span className="pipeline-drag-handle" aria-hidden="true">⋮⋮</span>
+        <span className="pipeline-drag-handle" aria-hidden="true">::</span>
         <input type="checkbox" checked={allSelected} onChange={(e) => onToggleAll(e.target.checked)} aria-label={`Select ${title} deals`} />
         {dot && <div style={{ width: 6, height: 6, borderRadius: 999, background: dot, flexShrink: 0 }} />}
         <div style={{ fontSize: 12, fontWeight: 600 }}>{title}</div>
         <span style={{ fontSize: 11, fontFamily: 'var(--pg-font-mono)', color: 'var(--pg-text-faint)' }}>{count}</span>
         <div style={{ flex: 1 }} />
         <span className="pg-mono" style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>{value}</span>
-        <button type="button" className="pg-btn pg-btn-icon pg-btn-sm" aria-label={`${title} column actions`}>
+        <div className="pipeline-menu-anchor">
+        <button type="button" className="pg-btn pg-btn-icon pg-btn-sm" onClick={onToggleMenu} aria-label={`${title} column actions`}>
           <Icon name="more" size={13} />
         </button>
+        {menuOpen && (
+          <div className="pipeline-popover pipeline-popover-sm">
+            <button type="button" onClick={() => onToggleAll(true)}>Select all in column</button>
+            <button type="button" onClick={() => onToggleAll(false)}>Clear column selection</button>
+            <button type="button" onClick={onSortByScore}>Sort board by score</button>
+          </div>
+        )}
+        </div>
       </div>
       <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto', flex: 1, minHeight: 80 }} className="pg-scroll">
         {children}
@@ -360,39 +491,81 @@ function KCol({
   );
 }
 
-function DraggableDealCard({ deal, selected, onSelect }: { deal: DisplayDeal; selected: boolean; onSelect: (checked: boolean) => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
+function DraggableDealCard({
+  deal,
+  selected,
+  menuOpen,
+  onSelect,
+  onToggleMenu,
+  onMove,
+}: {
+  deal: DisplayDeal;
+  selected: boolean;
+  menuOpen: boolean;
+  onSelect: (checked: boolean) => void;
+  onToggleMenu: () => void;
+  onMove: (dealId: number, status: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
 
   const style = transform
     ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1 }
     : { opacity: isDragging ? 0.4 : 1 };
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
-      <DealCardContent deal={deal} selected={selected} onSelect={onSelect} />
+    <div ref={setNodeRef} style={style}>
+      <DealCardContent
+        deal={deal}
+        selected={selected}
+        menuOpen={menuOpen}
+        onSelect={onSelect}
+        onToggleMenu={onToggleMenu}
+        onMove={onMove}
+        dragHandle={(
+          <button
+            type="button"
+            className="pipeline-card-drag"
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            aria-label={`Drag ${deal.displayAddress}`}
+          >
+            ::
+          </button>
+        )}
+      />
     </div>
   );
 }
 
 function DealCardContent({
-  deal, dragging, selected, onSelect,
-}: { deal: DisplayDeal; dragging?: boolean; selected: boolean; onSelect: (checked: boolean) => void }) {
+  deal, dragging, selected, menuOpen, onSelect, onToggleMenu, onMove, dragHandle,
+}: {
+  deal: DisplayDeal;
+  dragging?: boolean;
+  selected: boolean;
+  menuOpen?: boolean;
+  onSelect: (checked: boolean) => void;
+  onToggleMenu?: () => void;
+  onMove?: (dealId: number, status: string) => void;
+  dragHandle?: React.ReactNode;
+}) {
   const daysToSettlement = deal.settlementDate
     ? Math.round((new Date(deal.settlementDate).getTime() - TODAY_TS) / 86400000)
     : null;
+  const currentIndex = COLUMNS.indexOf(deal.status as typeof COLUMNS[number]);
+  const previousStatus = currentIndex > 0 ? COLUMNS[currentIndex - 1] : null;
+  const nextStatus = currentIndex >= 0 && currentIndex < COLUMNS.length - 1 ? COLUMNS[currentIndex + 1] : null;
 
   return (
-    <a
-      href={`/deals/${deal.id}`}
-      style={{ textDecoration: 'none', color: 'inherit', display: 'block', pointerEvents: dragging ? 'none' : 'auto' }}
-      onClick={(e) => dragging && e.preventDefault()}
-    >
+    <div style={{ pointerEvents: dragging ? 'none' : 'auto' }}>
       <div className="pipeline-deal-card" style={{
         borderColor: dragging ? 'var(--pg-accent)' : selected ? 'rgba(37,99,235,0.38)' : 'var(--pg-border)',
         cursor: dragging ? 'grabbing' : 'grab',
         boxShadow: dragging ? '0 8px 24px rgba(0,0,0,0.12)' : selected ? '0 0 0 3px rgba(37,99,235,0.08)' : 'none',
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          {dragHandle}
           <input
             type="checkbox"
             checked={selected}
@@ -401,12 +574,22 @@ function DealCardContent({
             aria-label={`Select ${deal.displayAddress}`}
           />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 650, lineHeight: 1.35 }}>{deal.displayAddress}</div>
+            <a href={`/deals/${deal.id}`} style={{ color: 'inherit', textDecoration: 'none', fontSize: 12.5, fontWeight: 650, lineHeight: 1.35 }}>{deal.displayAddress}</a>
             <div style={{ fontSize: 11, color: 'var(--pg-text-dim)' }}>{deal.displaySuburb}</div>
           </div>
-          <button type="button" className="pg-btn pg-btn-icon pg-btn-sm" onClick={(e) => e.preventDefault()} aria-label="Deal quick actions">
+          <div className="pipeline-menu-anchor">
+          <button type="button" className="pg-btn pg-btn-icon pg-btn-sm" onClick={(e) => { e.stopPropagation(); onToggleMenu?.(); }} aria-label="Deal quick actions">
             <Icon name="more" size={13} />
           </button>
+          {menuOpen && (
+            <div className="pipeline-popover pipeline-popover-sm">
+              <a href={`/deals/${deal.id}`}>Open deal</a>
+              {previousStatus && <button type="button" onClick={() => onMove?.(deal.id, previousStatus)}>Move to {getDealStatusLabel(previousStatus)}</button>}
+              {nextStatus && <button type="button" onClick={() => onMove?.(deal.id, nextStatus)}>Move to {getDealStatusLabel(nextStatus)}</button>}
+              <button type="button" onClick={() => onMove?.(deal.id, 'lost')}>Archive deal</button>
+            </div>
+          )}
+          </div>
         </div>
         {deal.priority !== 'standard' && (
           <div style={{ position: 'absolute', top: 8, right: 8, width: 5, height: 5, borderRadius: 999, background: deal.priority === 'urgent' ? 'var(--pg-red)' : 'var(--pg-amber)' }} />
@@ -442,7 +625,7 @@ function DealCardContent({
           </div>
         )}
       </div>
-    </a>
+    </div>
   );
 }
 
@@ -456,6 +639,21 @@ function UtilityBar({
   setShowViews,
   showColumns,
   setShowColumns,
+  sortMode,
+  setSortMode,
+  stageFilter,
+  setStageFilter,
+  agentFilter,
+  setAgentFilter,
+  highValueOnly,
+  setHighValueOnly,
+  visibleColumns,
+  setVisibleColumns,
+  availableAgents,
+  onBulkMove,
+  onBulkAssignAgent,
+  onArchiveSelected,
+  onExport,
 }: {
   query: string;
   setQuery: (value: string) => void;
@@ -466,7 +664,46 @@ function UtilityBar({
   setShowViews: (value: boolean) => void;
   showColumns: boolean;
   setShowColumns: (value: boolean) => void;
+  sortMode: SortMode;
+  setSortMode: (value: SortMode) => void;
+  stageFilter: string;
+  setStageFilter: (value: string) => void;
+  agentFilter: string;
+  setAgentFilter: (value: string) => void;
+  highValueOnly: boolean;
+  setHighValueOnly: (value: boolean) => void;
+  visibleColumns: TableColumn[];
+  setVisibleColumns: React.Dispatch<React.SetStateAction<TableColumn[]>>;
+  availableAgents: string[];
+  onBulkMove: (status: string) => void;
+  onBulkAssignAgent: (agentName: string) => void;
+  onArchiveSelected: () => void;
+  onExport: () => void;
 }) {
+  const [bulkStageOpen, setBulkStageOpen] = useState(false);
+  const [bulkAgentOpen, setBulkAgentOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+
+  function chooseView(viewName: 'all' | 'high_value' | 'due_diligence') {
+    if (viewName === 'high_value') {
+      setQuery('');
+      setStageFilter('all');
+      setAgentFilter('all');
+      setHighValueOnly(true);
+    } else if (viewName === 'due_diligence') {
+      setQuery('');
+      setStageFilter('due_diligence');
+      setAgentFilter('all');
+      setHighValueOnly(false);
+    } else {
+      setQuery('');
+      setStageFilter('all');
+      setAgentFilter('all');
+      setHighValueOnly(false);
+    }
+    setShowViews(false);
+  }
+
   return (
     <div className="pipeline-utility-wrap">
       <div className="pipeline-utility">
@@ -477,9 +714,31 @@ function UtilityBar({
         {selectedCount > 0 && (
           <div className="pipeline-bulkbar">
             <strong>{selectedCount} selected</strong>
-            <button type="button">Change stage</button>
-            <button type="button">Change agent</button>
-            <button type="button">Archive</button>
+            <div className="pipeline-menu-anchor">
+              <button type="button" onClick={() => setBulkStageOpen((open) => !open)}>Change stage</button>
+              {bulkStageOpen && (
+                <div className="pipeline-popover pipeline-popover-sm">
+                  {COLUMNS.map((status) => (
+                    <button key={status} type="button" onClick={() => { onBulkMove(status); setBulkStageOpen(false); }}>
+                      {getDealStatusLabel(status)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="pipeline-menu-anchor">
+              <button type="button" onClick={() => setBulkAgentOpen((open) => !open)}>Change agent</button>
+              {bulkAgentOpen && (
+                <div className="pipeline-popover pipeline-popover-sm">
+                  {availableAgents.map((agentName) => (
+                    <button key={agentName} type="button" onClick={() => { onBulkAssignAgent(agentName); setBulkAgentOpen(false); }}>
+                      {agentName}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button type="button" onClick={onArchiveSelected}>Archive</button>
           </div>
         )}
         <div style={{ flex: 1 }} />
@@ -490,14 +749,44 @@ function UtilityBar({
           {showFilters && (
             <div className="pipeline-popover">
               <div className="pg-label">Filters</div>
-              <label><input type="checkbox" defaultChecked /> Active stages</label>
-              <label><input type="checkbox" /> Price above $1.5M</label>
-              <label><input type="checkbox" /> Sarah Chen</label>
-              <button type="button" className="pg-btn pg-btn-sm">Apply filters</button>
+              <label>
+                Stage
+                <select className="pg-input" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
+                  <option value="all">All stages</option>
+                  {COLUMNS.map((status) => <option key={status} value={status}>{getDealStatusLabel(status)}</option>)}
+                </select>
+              </label>
+              <label>
+                Agent
+                <select className="pg-input" value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)}>
+                  <option value="all">All agents</option>
+                  {availableAgents.map((agentName) => <option key={agentName} value={agentName}>{agentName}</option>)}
+                </select>
+              </label>
+              <label><input type="checkbox" checked={highValueOnly} onChange={(e) => setHighValueOnly(e.target.checked)} /> Price above $1.5M</label>
+              <button type="button" className="pg-btn pg-btn-sm" onClick={() => setShowFilters(false)}>Apply filters</button>
             </div>
           )}
         </div>
-        <button type="button" className="pg-btn"><Icon name="sliders" size={13} />Sort</button>
+        <div className="pipeline-menu-anchor">
+          <button type="button" className="pg-btn" onClick={() => setSortOpen((open) => !open)}>
+            <Icon name="sliders" size={13} />Sort <Icon name="chevron-down" size={11} />
+          </button>
+          {sortOpen && (
+            <div className="pipeline-popover pipeline-popover-sm">
+              {[
+                ['created_desc', 'Newest created'],
+                ['value_desc', 'Highest value'],
+                ['score_desc', 'Highest score'],
+                ['activity_asc', 'Last activity'],
+              ].map(([value, label]) => (
+                <button key={value} type="button" onClick={() => { setSortMode(value as SortMode); setSortOpen(false); }}>
+                  {sortMode === value ? '* ' : ''}{label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="pipeline-menu-anchor">
           <button type="button" className="pg-btn" onClick={() => setShowViews(!showViews)}>
             <Icon name="bookmark" size={13} />Custom Views <Icon name="chevron-down" size={11} />
@@ -505,11 +794,11 @@ function UtilityBar({
           {showViews && (
             <div className="pipeline-popover">
               <div className="pg-label">Saved views</div>
-              <button type="button">All active deals</button>
-              <button type="button">High Value Deals</button>
-              <button type="button">Due diligence this week</button>
+              <button type="button" onClick={() => chooseView('all')}>All active deals</button>
+              <button type="button" onClick={() => chooseView('high_value')}>High Value Deals</button>
+              <button type="button" onClick={() => chooseView('due_diligence')}>Due diligence this week</button>
               <div className="pg-divider" />
-              <button type="button" className="pg-btn pg-btn-sm"><Icon name="plus" size={11} />Save current view</button>
+              <button type="button" className="pg-btn pg-btn-sm" onClick={() => setShowViews(false)}><Icon name="plus" size={11} />Save current view</button>
             </div>
           )}
         </div>
@@ -520,13 +809,19 @@ function UtilityBar({
           {showColumns && (
             <div className="pipeline-popover">
               <div className="pg-label">Visible columns</div>
-              {['Client', 'Stage', 'Price/Value', 'Agent', 'Score', 'Created Date', 'Last Activity'].map((column) => (
-                <label key={column}><input type="checkbox" defaultChecked /> {column}</label>
+              {TABLE_COLUMNS.map((column) => (
+                <label key={column}>
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.includes(column)}
+                    onChange={(e) => setVisibleColumns((current) => e.target.checked ? [...current, column] : current.filter((c) => c !== column))}
+                  /> {column}
+                </label>
               ))}
             </div>
           )}
         </div>
-        <button type="button" className="pg-btn"><Icon name="file" size={13} />Export</button>
+        <button type="button" className="pg-btn" onClick={onExport}><Icon name="file" size={13} />Export</button>
       </div>
     </div>
   );
@@ -536,10 +831,20 @@ function DealListView({
   deals,
   selectedIds,
   setSelectedIds,
+  visibleColumns,
+  onSort,
+  activeMenuId,
+  onToggleMenu,
+  onMove,
 }: {
   deals: DisplayDeal[];
   selectedIds: number[];
   setSelectedIds: React.Dispatch<React.SetStateAction<number[]>>;
+  visibleColumns: TableColumn[];
+  onSort: (sortMode: SortMode) => void;
+  activeMenuId: number | null;
+  onToggleMenu: (dealId: number) => void;
+  onMove: (dealId: number, status: string) => void;
 }) {
   const allSelected = deals.length > 0 && deals.every((deal) => selectedIds.includes(deal.id));
   const toggleAll = (checked: boolean) => {
@@ -553,13 +858,14 @@ function DealListView({
         <thead>
           <tr>
             <th style={{ width: 42 }}><input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} aria-label="Select all deals" /></th>
-            {['Deal Name / Address', 'Client', 'Stage', 'Price / Value', 'Agent', 'Score', 'Created Date', 'Last Activity'].map((header) => (
-              <th key={header}>
-                <span>{header}</span>
-                <Icon name="arrow-down" size={10} color="var(--pg-text-faint)" />
-                <i aria-hidden="true" />
-              </th>
-            ))}
+            <SortableTh label="Deal Name / Address" onClick={() => onSort('created_desc')} />
+            {visibleColumns.includes('Client') && <SortableTh label="Client" onClick={() => onSort('created_desc')} />}
+            {visibleColumns.includes('Stage') && <SortableTh label="Stage" onClick={() => onSort('created_desc')} />}
+            {visibleColumns.includes('Price/Value') && <SortableTh label="Price / Value" onClick={() => onSort('value_desc')} />}
+            {visibleColumns.includes('Agent') && <SortableTh label="Agent" onClick={() => onSort('created_desc')} />}
+            {visibleColumns.includes('Score') && <SortableTh label="Score" onClick={() => onSort('score_desc')} />}
+            {visibleColumns.includes('Created Date') && <SortableTh label="Created Date" onClick={() => onSort('created_desc')} />}
+            {visibleColumns.includes('Last Activity') && <SortableTh label="Last Activity" onClick={() => onSort('activity_asc')} />}
             <th style={{ width: 44 }} />
           </tr>
         </thead>
@@ -575,16 +881,31 @@ function DealListView({
                     <span>{deal.displaySuburb}</span>
                   </a>
                 </td>
-                <td>{deal.cleanClientName}</td>
-                <td><span className={`pg-badge ${STAGE_BADGE[deal.status] ?? 'pg-badge-gray'}`}>{getDealStatusLabel(deal.status)}</span></td>
-                <td className="pg-mono">{deal.valueLabel}</td>
-                <td>
+                {visibleColumns.includes('Client') && <td>{deal.cleanClientName}</td>}
+                {visibleColumns.includes('Stage') && <td><span className={`pg-badge ${STAGE_BADGE[deal.status] ?? 'pg-badge-gray'}`}>{getDealStatusLabel(deal.status)}</span></td>}
+                {visibleColumns.includes('Price/Value') && <td className="pg-mono">{deal.valueLabel}</td>}
+                {visibleColumns.includes('Agent') && <td>
                   <span className="pipeline-agent"><span className="pg-avatar pg-avatar-sm">{initials(deal.agentName)}</span>{deal.agentName}</span>
+                </td>}
+                {visibleColumns.includes('Score') && <td><span className="pipeline-score-cell"><MatchScore score={deal.scorePct} size={24} stroke={2.4} />{deal.scorePct}%</span></td>}
+                {visibleColumns.includes('Created Date') && <td>{dateLabel(deal.createdAt)}</td>}
+                {visibleColumns.includes('Last Activity') && <td>{deal.lastActivity}</td>}
+                <td>
+                  <div className="pipeline-menu-anchor">
+                    <button type="button" className="pg-btn pg-btn-icon pg-btn-sm" onClick={() => onToggleMenu(deal.id)} aria-label="Deal actions"><Icon name="more" size={13} /></button>
+                    {activeMenuId === deal.id && (
+                      <div className="pipeline-popover pipeline-popover-sm">
+                        <a href={`/deals/${deal.id}`}>Open deal</a>
+                        {COLUMNS.filter((status) => status !== deal.status).map((status) => (
+                          <button key={status} type="button" onClick={() => onMove(deal.id, status)}>
+                            Move to {getDealStatusLabel(status)}
+                          </button>
+                        ))}
+                        <button type="button" onClick={() => onMove(deal.id, 'lost')}>Archive deal</button>
+                      </div>
+                    )}
+                  </div>
                 </td>
-                <td><span className="pipeline-score-cell"><MatchScore score={deal.scorePct} size={24} stroke={2.4} />{deal.scorePct}%</span></td>
-                <td>{dateLabel(deal.createdAt)}</td>
-                <td>{deal.lastActivity}</td>
-                <td><button type="button" className="pg-btn pg-btn-icon pg-btn-sm" aria-label="Deal actions"><Icon name="more" size={13} /></button></td>
               </tr>
             );
           })}
@@ -600,6 +921,18 @@ function DealListView({
         </div>
       </div>
     </div>
+  );
+}
+
+function SortableTh({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <th>
+      <button type="button" className="pipeline-th-btn" onClick={onClick}>
+        <span>{label}</span>
+        <Icon name="arrow-down" size={10} color="var(--pg-text-faint)" />
+      </button>
+      <i aria-hidden="true" />
+    </th>
   );
 }
 

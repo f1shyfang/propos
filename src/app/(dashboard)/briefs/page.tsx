@@ -22,6 +22,8 @@ export default async function BriefsPage() {
     id: b.id,
     clientName: b.clientName,
     email: b.email,
+    phone: b.phone,
+    agent: 'Jess Morgan',
     budgetMin: b.budgetMin,
     budgetMax: b.budgetMax,
     suburbs: ((b.suburbs as string[]) ?? []).map(cleanSuburb),
