@@ -40,7 +40,7 @@ const STATUS_LABEL: Record<string, string> = {
   new: 'Awaiting',
 };
 
-const GRID = '2.2fr 1.3fr 0.7fr 0.9fr 1fr 0.7fr 1fr';
+const GRID = 'minmax(0,2.2fr) minmax(0,1.3fr) minmax(0,0.7fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,1fr)';
 
 function timeAgo(iso: string | null): string {
   if (!iso) return '—';
@@ -140,19 +140,19 @@ export function DashboardFeedback() {
       ) : (
         <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
           <div style={{
-            display: 'grid', gridTemplateColumns: GRID,
+            display: 'grid', gridTemplateColumns: GRID, gap: 16, alignItems: 'center',
             padding: '10px 16px',
             borderBottom: '1px solid var(--pg-border)',
             fontSize: 10.5, color: 'var(--pg-text-faint)', letterSpacing: '0.06em',
             textTransform: 'uppercase', fontWeight: 500,
           }}>
-            <span>Property</span>
-            <span>Client</span>
-            <span>Match</span>
-            <span style={{ textAlign: 'right' }}>Price</span>
-            <span>Status</span>
-            <span style={{ textAlign: 'right' }}>Feedback</span>
-            <span>Action</span>
+            <span style={{ minWidth: 0 }}>Property</span>
+            <span style={{ minWidth: 0 }}>Client</span>
+            <span style={{ minWidth: 0 }}>Match</span>
+            <span style={{ textAlign: 'right', minWidth: 0 }}>Price</span>
+            <span style={{ minWidth: 0 }}>Status</span>
+            <span style={{ textAlign: 'right', minWidth: 0 }}>Feedback</span>
+            <span style={{ minWidth: 0 }}>Action</span>
           </div>
           {rows.map((r, i, a) => {
             const initials = r.clientName
@@ -168,13 +168,14 @@ export function DashboardFeedback() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: GRID,
+                  gap: 16,
                   padding: '12px 16px',
                   alignItems: 'center',
                   borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
                   fontSize: 13,
                 }}
               >
-                <a href={`/properties/${r.property.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                <a href={`/properties/${r.property.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 11, minWidth: 0, overflow: 'hidden' }}>
                   <PropertyThumb seed={i % 6} height={36} style={{ width: 56, flexShrink: 0, borderRadius: 5 }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 500 }} className="pg-truncate">
@@ -185,17 +186,17 @@ export function DashboardFeedback() {
                     </div>
                   </div>
                 </a>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, overflow: 'hidden' }}>
                   <div className="pg-avatar pg-avatar-sm">{initials}</div>
                   <span className="pg-truncate">{r.clientName}</span>
                 </div>
-                <div>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
                   <MatchScore score={r.property.score} size={28} stroke={2.5} />
                 </div>
-                <div style={{ textAlign: 'right', fontFamily: 'var(--pg-font-mono)' }}>
+                <div style={{ textAlign: 'right', fontFamily: 'var(--pg-font-mono)', minWidth: 0, overflow: 'hidden' }}>
                   {r.property.price}
                 </div>
-                <div>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
                   <span
                     className={`pg-badge ${STATUS_CLASS[r.feedbackStatus] ?? ''}`}
                     style={{ fontSize: 11 }}
@@ -203,10 +204,10 @@ export function DashboardFeedback() {
                     {STATUS_LABEL[r.feedbackStatus] ?? r.feedbackStatus}
                   </span>
                 </div>
-                <div style={{ textAlign: 'right', color: 'var(--pg-text-faint)', fontSize: 12 }}>
+                <div style={{ textAlign: 'right', color: 'var(--pg-text-faint)', fontSize: 12, minWidth: 0, overflow: 'hidden' }}>
                   {timeAgo(r.feedbackAt)}
                 </div>
-                <div>
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
                   {r.briefId && r.feedbackStatus === 'interested' && (
                     <ShortlistDealButton
                       briefId={r.briefId}
