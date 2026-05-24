@@ -72,7 +72,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const updates: Record<string, unknown> = {};
   const allowed = ['status', 'offerSubState', 'offerAmount', 'offerConditions', 'settlementDate', 'exchangeDate', 'isAuction', 'priority', 'listingAgentName', 'listingAgentPhone', 'listingAgentEmail', 'strategyNotes'];
   for (const key of allowed) {
-    if (key in body) updates[key] = body[key];
+    if (!(key in body)) continue;
+    if ((key === 'exchangeDate' || key === 'settlementDate') && body[key]) {
+      updates[key] = new Date(body[key] as string);
+    } else {
+      updates[key] = body[key];
+    }
   }
 
   if ('status' in body && body.status) {
@@ -95,13 +100,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.status === 'under_contract' && body.exchangeDate && body.settlementDate) {
     const existing = await db.select().from(dealMilestonesTable).where(eq(dealMilestonesTable.dealId, dealId));
     if (!existing.length) {
-      const [deal] = await db.select().from(dealsTable).leftJoin(propertiesTable, eq(dealsTable.propertyId, propertiesTable.id)).where(eq(dealsTable.id, dealId));
-      const state = (deal as { state?: string | null }).state ?? 'NSW';
+      const [row] = await db
+        .select({ state: propertiesTable.state, isAuction: dealsTable.isAuction })
+        .from(dealsTable)
+        .leftJoin(propertiesTable, eq(dealsTable.propertyId, propertiesTable.id))
+        .where(eq(dealsTable.id, dealId));
+      const state = row?.state ?? 'NSW';
       const milestones = generateSettlementMilestones(
         new Date(body.exchangeDate),
         new Date(body.settlementDate),
         state,
-        updated.isAuction ?? false,
+        row?.isAuction ?? updated.isAuction ?? false,
       );
       await db.insert(dealMilestonesTable).values(
         milestones.map((m, i) => ({ dealId, title: m.title, dayOffset: m.dayOffset, dueDate: m.dueDate, status: 'pending' as const, sortOrder: i }))
