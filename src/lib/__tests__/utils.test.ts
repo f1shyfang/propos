@@ -36,15 +36,15 @@ describe('formatPrice', () => {
     expect(formatPrice(1000000, '$1.5M - $1.7M')).toBe('$1.5M - $1.7M');
   });
 
-  it('formats millions with 2 decimal places', () => {
-    expect(formatPrice(1500000, null)).toBe('$1.50M');
+  it('formats millions as expanded value with commas', () => {
+    expect(formatPrice(1500000, null)).toBe('$1,500,000');
   });
 
-  it('formats sub-million as $xxxK', () => {
-    expect(formatPrice(850000, null)).toBe('$850K');
+  it('formats sub-million as expanded value with commas', () => {
+    expect(formatPrice(850000, null)).toBe('$850,000');
   });
 
-  it('formats exactly 1 million', () => {
-    expect(formatPrice(1000000, null)).toBe('$1.00M');
+  it('formats exactly 1 million as expanded value with commas', () => {
+    expect(formatPrice(1000000, null)).toBe('$1,000,000');
   });
 });

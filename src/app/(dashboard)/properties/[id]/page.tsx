@@ -19,10 +19,9 @@ function scoreToMatchPct(overall: number | null): number {
 }
 
 function formatPrice(price: number | null, display: string | null): string {
-  if (display) return display;
+  if (display && display !== "null" && display !== "NULL" && display !== "NaN") return display;
   if (!price) return '—';
-  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(2)}M`;
-  return `$${(price / 1000).toFixed(0)}K`;
+  return `$${price.toLocaleString("en-AU")}`;
 }
 
 function calcStampDuty(price: number | null): string {
