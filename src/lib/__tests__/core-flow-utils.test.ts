@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildBriefMatchesHref,
+  buildLegacyBriefMatchesPath,
   buildClientBriefHref,
   buildClientFeedbackUpdate,
   shouldIncludeFeedbackPollItem,
@@ -10,6 +11,12 @@ import {
 describe('buildBriefMatchesHref', () => {
   it('routes new briefs to the implemented matches tab', () => {
     expect(buildBriefMatchesHref(42)).toBe('/briefs/42?tab=matches');
+  });
+});
+
+describe('buildLegacyBriefMatchesPath', () => {
+  it('preserves the old nested path for redirects', () => {
+    expect(buildLegacyBriefMatchesPath(42)).toBe('/briefs/42/matches');
   });
 });
 

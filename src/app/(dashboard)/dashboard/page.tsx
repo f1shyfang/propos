@@ -144,7 +144,7 @@ export default async function DashboardPage() {
           <div>
             <SectionHead title="Pipeline stages" sub="Live from your deals" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {['suggested', 'approved', 'due_diligence', 'offer_made', 'under_contract', 'settled'].map((stage) => (
+              {['suggested', 'approved', 'due_diligence', 'offer_made', 'under_contract', 'unconditional', 'settled'].map((stage) => (
                 <div key={stage} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
                   <span style={{ flex: 1, textTransform: 'capitalize' }}>{stage.replace(/_/g, ' ')}</span>
                   <span className="pg-mono" style={{ color: 'var(--pg-text-dim)' }}>

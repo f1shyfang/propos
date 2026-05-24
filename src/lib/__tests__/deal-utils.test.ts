@@ -10,8 +10,11 @@ import {
 } from '../deal-utils';
 
 describe('DEAL_STATUSES', () => {
-  it('contains all 8 pipeline columns', () => {
-    const required = ['suggested', 'approved', 'due_diligence', 'offer_made', 'under_contract', 'settled', 'lost', 'withdrawn'];
+  it('contains all pipeline columns including unconditional', () => {
+    const required = [
+      'suggested', 'approved', 'due_diligence', 'offer_made', 'under_contract',
+      'unconditional', 'settled', 'lost', 'withdrawn',
+    ];
     required.forEach(s => expect(DEAL_STATUSES).toContain(s));
   });
 });
@@ -30,6 +33,7 @@ describe('getDealStatusLabel', () => {
     expect(getDealStatusLabel('due_diligence')).toBe('Due Diligence');
     expect(getDealStatusLabel('offer_made')).toBe('Offer Made');
     expect(getDealStatusLabel('under_contract')).toBe('Under Contract');
+    expect(getDealStatusLabel('unconditional')).toBe('Unconditional');
     expect(getDealStatusLabel('settled')).toBe('Settled');
     expect(getDealStatusLabel('lost')).toBe('Lost');
     expect(getDealStatusLabel('withdrawn')).toBe('Withdrawn');

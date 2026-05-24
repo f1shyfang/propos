@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dealsTable, buyerBriefsTable, propertiesTable, dealChecklistItemsTable, dealMilestonesTable, dealContactsTable, dealDocumentsTable } from '@/lib/db/schema';
+import {
+  dealsTable,
+  buyerBriefsTable,
+  propertiesTable,
+  dealChecklistItemsTable,
+  dealMilestonesTable,
+  dealContactsTable,
+  dealDocumentsTable,
+  dealOfferEventsTable,
+} from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { generateSettlementMilestones } from '@/lib/deal-utils';
 import { validateStatusTransition } from '@/lib/deals';
+import { buildOfferHistoryEntries } from '@/lib/offer-history';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -80,12 +90,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
+  const [before] = await db
+    .select({
+      status: dealsTable.status,
+      offerAmount: dealsTable.offerAmount,
+      offerSubState: dealsTable.offerSubState,
+    })
+    .from(dealsTable)
+    .where(eq(dealsTable.id, dealId));
+
+  if (!before) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+
   if ('status' in body && body.status) {
-    const [current] = await db.select({ status: dealsTable.status }).from(dealsTable).where(eq(dealsTable.id, dealId));
-    if (!current) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
-    if (!validateStatusTransition(current.status ?? 'suggested', body.status)) {
+    if (!validateStatusTransition(before.status ?? 'suggested', body.status)) {
       return NextResponse.json(
-        { error: `Invalid status transition: ${current.status} → ${body.status}` },
+        { error: `Invalid status transition: ${before.status} → ${body.status}` },
         { status: 422 },
       );
     }
@@ -93,8 +112,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   updates.updatedAt = new Date();
 
+  const offerHistory = buildOfferHistoryEntries(
+    {
+      offerAmount: before.offerAmount,
+      offerSubState: before.offerSubState,
+    },
+    {
+      offerAmount: body.offerAmount,
+      offerSubState: body.offerSubState,
+    },
+  );
+
   const [updated] = await db.update(dealsTable).set(updates).where(eq(dealsTable.id, dealId)).returning();
   if (!updated) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+
+  if (offerHistory.length > 0) {
+    await db.insert(dealOfferEventsTable).values(
+      offerHistory.map((entry) => ({
+        dealId,
+        eventType: entry.eventType,
+        previousValue: entry.previousValue,
+        newValue: entry.newValue,
+      })),
+    );
+  }
 
   // When moving to under_contract with an exchange date, generate milestones if none exist
   if (body.status === 'under_contract' && body.exchangeDate && body.settlementDate) {

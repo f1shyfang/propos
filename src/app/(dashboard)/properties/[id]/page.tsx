@@ -7,6 +7,7 @@ import { Icon } from '@/components/shared/icon';
 import { PropertyThumb } from '@/components/shared/property-thumb';
 import { MatchScore } from '@/components/shared/match-score';
 import { PropertyShortlistActions } from '@/components/shortlists/property-shortlist-actions';
+import { PropertyOutreachPanel } from '@/components/properties/property-outreach-panel';
 import { calculatePricePerSqm } from '@/lib/cma-utils';
 import { computeMatchScore } from '@/lib/match-score';
 import { briefRowToCriteria, propertyRowToMatchInput, suburbMatches } from '@/lib/match-properties-for-brief';
@@ -468,24 +469,19 @@ export default async function PropertyDetailPage({
             </div>
           </div>
 
-          {/* Listing agent */}
-          <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
-            <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-bg-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="pg-label">Listing info</span>
-            </div>
-            <div style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div className="pg-avatar pg-avatar-lg" style={{ background: 'var(--pg-bg-2)' }}>LA</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{p.suburb ?? 'Local'} Agency</div>
-                <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>Listed on realestate.com.au</div>
-              </div>
-              {p.url && (
-                <a href={p.url} target="_blank" rel="noopener noreferrer" className="pg-btn pg-btn-icon">
-                  <Icon name="arrow-up-right" size={13} />
-                </a>
-              )}
-            </div>
-          </div>
+          <PropertyOutreachPanel propertyId={id} briefId={selectedBrief?.id ?? null} />
+          {p.url && (
+            <a
+              href={p.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pg-btn pg-btn-sm"
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <Icon name="arrow-up-right" size={13} />
+              View listing
+            </a>
+          )}
 
           {/* Crime & Safety */}
           {s && (s.crimeRank != null || s.violentPer1000 != null || s.propertyPer1000 != null) && (
@@ -574,29 +570,6 @@ export default async function PropertyDetailPage({
             </div>
           </div>
 
-          {/* Activity */}
-          <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
-            <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-bg-2)' }}>
-              <span className="pg-label">Recent activity</span>
-            </div>
-            <div style={{ padding: '4px 14px' }}>
-              {[
-                { d: 'Today', e: 'Property viewed', i: 'eye' as const, c: 'var(--pg-text-dim)' },
-                { d: 'Recent', e: `Matched · ${matchScore} score`, i: 'sparkles' as const, c: 'var(--pg-text-dim)' },
-                { d: 'Listed', e: `Listed for ${price}`, i: 'building' as const, c: 'var(--pg-text-dim)' },
-              ].map((h, i) => (
-                <div key={i} style={{ display: 'flex', gap: 11, padding: '8px 0', fontSize: 12.5 }}>
-                  <div style={{ width: 22, display: 'flex', justifyContent: 'center', paddingTop: 1 }}>
-                    <Icon name={h.i} size={12} color={h.c} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div>{h.e}</div>
-                    <div style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>{h.d}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </aside>
       </div>
     </div>

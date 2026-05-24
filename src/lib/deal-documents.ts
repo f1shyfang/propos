@@ -8,7 +8,8 @@ import {
 } from '@/lib/db/schema';
 import { buildDealDocumentS3Key } from '@/lib/storage/document-keys';
 import { putObject } from '@/lib/storage/s3';
-import { renderOfferLetterPdf, renderCmaReportPdf } from '@/lib/pdf/render';
+import { renderOfferLetterPdf, renderCmaReportPdf, renderInvoicePdf } from '@/lib/pdf/render';
+import { calcBuyersAgentFee } from '@/lib/invoice-utils';
 import type { CmaComparable } from '@/lib/pdf/cma-report';
 
 export async function loadDealForDocuments(dealId: number) {
@@ -165,6 +166,58 @@ export async function generateCmaDocument(dealId: number, uploadedBy: string) {
       s3Key,
       mimeType: 'application/pdf',
       source: 'generated_cma',
+      status: 'ready',
+      fileSize: buffer.length,
+      uploadedBy,
+      generatedAt: now,
+    })
+    .returning();
+
+  return doc;
+}
+
+export async function generateInvoiceDocument(dealId: number, uploadedBy: string) {
+  const deal = await loadDealForDocuments(dealId);
+  if (!deal) throw new Error('Deal not found');
+
+  const [priceRow] = await db
+    .select({ price: propertiesTable.price, offerAmount: dealsTable.offerAmount })
+    .from(dealsTable)
+    .leftJoin(propertiesTable, eq(dealsTable.propertyId, propertiesTable.id))
+    .where(eq(dealsTable.id, dealId));
+
+  const feeAmount = calcBuyersAgentFee(
+    priceRow?.price ?? null,
+    priceRow?.offerAmount ?? deal.offerAmount,
+  );
+  if (feeAmount <= 0) {
+    throw new Error('Set an offer amount or property price before generating an invoice');
+  }
+
+  const buffer = await renderInvoicePdf({
+    clientName: deal.clientName ?? 'Client',
+    propertyAddress: deal.address ?? 'Property',
+    suburb: deal.suburb,
+    state: deal.state,
+    feeAmount,
+    purchaseReference: priceRow?.offerAmount ?? priceRow?.price ?? null,
+    date: new Date(),
+  });
+
+  const filename = `invoice-${deal.address?.replace(/[^\w]+/g, '-').slice(0, 40) ?? dealId}.pdf`;
+  const s3Key = buildDealDocumentS3Key(dealId, filename);
+  await putObject(buffer, s3Key, 'application/pdf');
+
+  const now = new Date();
+  const [doc] = await db
+    .insert(dealDocumentsTable)
+    .values({
+      dealId,
+      filename,
+      tag: 'Invoice',
+      s3Key,
+      mimeType: 'application/pdf',
+      source: 'generated_invoice',
       status: 'ready',
       fileSize: buffer.length,
       uploadedBy,

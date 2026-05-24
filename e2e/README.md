@@ -2,13 +2,16 @@
 
 Exercises the buyer's-agent demo lifecycle over HTTP (brief → matches → shortlist → portal feedback → deal → offer → under contract → due diligence).
 
+**Live presenter script (routes, labels, skipped beats):** [`docs/DEMO-SCRIPT.md`](../docs/DEMO-SCRIPT.md)
+
 ## Prerequisites
 
 1. `DATABASE_URL` in `.env.local`
 2. Properties in the database (`scripts/populate.ts`)
 3. Demo client linked: `pnpm seed:demo` (links `sarah@demo.com` for share + portal)
 
-Optional: `pnpm seed:cma` if the lead property has no suburb comparables.
+Optional: `pnpm seed:cma` if the lead property has no suburb comparables.  
+After schema changes: `pnpm db:push`. Static demo PDFs: `pnpm seed:demo-pdfs`.
 
 ## Run
 

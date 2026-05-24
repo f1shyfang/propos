@@ -13,7 +13,14 @@ import {
   type DealStatus,
 } from '@/lib/deal-utils';
 
-const ACTIVE_STATUSES = ['suggested', 'approved', 'due_diligence', 'offer_made', 'under_contract'] as const;
+const ACTIVE_STATUSES = [
+  'suggested',
+  'approved',
+  'due_diligence',
+  'offer_made',
+  'under_contract',
+  'unconditional',
+] as const;
 const TERMINAL_STATUSES = ['settled', 'lost', 'withdrawn'] as const;
 
 export type DealSummaryRow = {

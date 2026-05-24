@@ -39,6 +39,7 @@ const COLUMN_CONFIG: Record<string, { dot?: string; muted?: boolean }> = {
   due_diligence: { dot: 'var(--pg-amber)' },
   offer_made: { dot: 'var(--pg-purple)' },
   under_contract: { dot: 'var(--pg-green)' },
+  unconditional: { dot: 'var(--pg-teal, #0d9488)' },
   settled: { dot: 'var(--pg-green)', muted: true },
 };
 

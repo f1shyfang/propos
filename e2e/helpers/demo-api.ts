@@ -167,3 +167,19 @@ export async function fetchCma(request: APIRequestContext, propertyId: string) {
   if (res.status() === 404) return null;
   return json<{ comparables: unknown[]; estimatedValue: number | null }>(res);
 }
+
+export async function fetchOfferEvents(request: APIRequestContext, dealId: number) {
+  const res = await request.get(`/api/deals/${dealId}/offer-events`);
+  return json<{ events: Array<{ eventType: string; newValue: string | null }> }>(res);
+}
+
+export async function logPropertyOutreach(
+  request: APIRequestContext,
+  propertyId: string,
+  briefId?: number,
+) {
+  const res = await request.post(`/api/properties/${propertyId}/outreach`, {
+    data: { templateId: 'intro_anonymised', briefId: briefId ?? null },
+  });
+  return json<{ outreach: { id: number; templateId: string } }>(res);
+}

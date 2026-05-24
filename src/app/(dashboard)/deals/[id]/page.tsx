@@ -8,6 +8,7 @@ import { getDealStatusLabel, getOfferSubStateLabel, DEAL_STATUSES, calcCoolingOf
 import { calcStampDuty } from '@/lib/settlement-utils';
 import { DealDocumentPanel } from '@/components/deals/deal-document-panel';
 import { DealDocumentActions, type DealDocumentRow } from '@/components/deals/deal-document-actions';
+import { OfferHistoryTimeline } from '@/components/deals/offer-history-timeline';
 
 type Tab = 'overview' | 'due_diligence' | 'cma' | 'offer' | 'settlement' | 'contacts' | 'documents';
 
@@ -427,7 +428,7 @@ export default function DealDetailPage() {
 
         {/* DOCUMENTS TAB */}
         {tab === 'documents' && (
-          <DocumentsTab dealId={id} documents={documents} onRefresh={load} />
+          <DocumentsTab dealId={id} documents={documents} onRefresh={load} dealStatus={deal.status} />
         )}
       </div>
     </div>
@@ -512,6 +513,7 @@ function OfferTab({ deal, dealId, documents, onSave, onRefresh, saving }: {
         tagFilter={['Offer Letter', 'Contract of Sale', 'Correspondence', 'Other']}
         allowGenerate="offer"
       />
+      <OfferHistoryTimeline dealId={dealId} key={`${dealId}-${deal.offerSubState}-${deal.offerAmount}`} />
     </div>
   );
 }
@@ -687,14 +689,27 @@ function ContactsTab({ dealId, contacts, onRefresh }: { dealId: string; contacts
 }
 
 // ── Documents Tab ─────────────────────────────────────────────────────────────
-function DocumentsTab({ dealId, documents, onRefresh }: { dealId: string; documents: Document[]; onRefresh: () => Promise<void> }) {
+function DocumentsTab({
+  dealId,
+  documents,
+  onRefresh,
+  dealStatus,
+}: {
+  dealId: string;
+  documents: Document[];
+  onRefresh: () => Promise<void>;
+  dealStatus: string;
+}) {
+  const canInvoice = ['under_contract', 'unconditional', 'settled'].includes(dealStatus);
+
   return (
     <DealDocumentPanel
       dealId={dealId}
       documents={documents}
       onRefresh={onRefresh}
       title="All documents"
-      allowGenerate={null}
+      tagFilter={['CMA Report', 'Offer Letter', 'Invoice', 'Contract of Sale', 'Other']}
+      allowGenerate={canInvoice ? 'invoice' : null}
     />
   );
 }

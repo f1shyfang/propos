@@ -2,6 +2,11 @@ export function buildBriefMatchesHref(briefId: number): string {
   return `/briefs/${briefId}?tab=matches`;
 }
 
+/** Legacy route segment; use a redirect page to `buildBriefMatchesHref`. */
+export function buildLegacyBriefMatchesPath(briefId: number): string {
+  return `/briefs/${briefId}/matches`;
+}
+
 export function buildClientBriefHref(briefId: number): string {
   return `/client-brief/${briefId}`;
 }

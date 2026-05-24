@@ -9,7 +9,9 @@ import {
   fetchDashboardFeedback,
   fetchDeal,
   fetchMatches,
+  fetchOfferEvents,
   fetchPortalShortlists,
+  logPropertyOutreach,
   patchDeal,
   shareShortlist,
   submitFeedback,
@@ -41,6 +43,14 @@ test.describe('Buyer agent demo flow', () => {
     briefId = brief.id;
     expect(briefId).toBeGreaterThan(0);
     expect(brief.clientUserId, `Link client with: pnpm seed:demo (${DEMO_CLIENT_EMAIL})`).toBeTruthy();
+  });
+
+  test('phase 2 — legacy /matches redirects to tab=matches', async ({ request }) => {
+    const res = await request.get(`/briefs/${briefId}/matches`, { maxRedirects: 0 });
+    expect(res.status()).toBeGreaterThanOrEqual(300);
+    expect(res.status()).toBeLessThan(400);
+    const location = res.headers()['location'] ?? '';
+    expect(location).toContain(`tab=matches`);
   });
 
   test('phase 2 — scored matches for brief', async ({ request }) => {
@@ -103,7 +113,12 @@ test.describe('Buyer agent demo flow', () => {
     expect(deal.offerSubState).toBe('sent');
   });
 
-  test('phase 8 — negotiation sub-states', async ({ request }) => {
+  test('phase 4 — property outreach logged', async ({ request }) => {
+    const outreach = await logPropertyOutreach(request, leadPropertyId, briefId);
+    expect(outreach.outreach.templateId).toBe('intro_anonymised');
+  });
+
+  test('phase 8 — negotiation sub-states and offer history', async ({ request }) => {
     await patchDeal(request, dealId, { offerSubState: 'counter_offer' });
     await patchDeal(request, dealId, {
       offerSubState: 'accepted',
@@ -111,6 +126,11 @@ test.describe('Buyer agent demo flow', () => {
     });
     const { deal } = await fetchDeal(request, dealId);
     expect(deal.offerSubState).toBe('accepted');
+
+    const { events } = await fetchOfferEvents(request, dealId);
+    expect(events.length).toBeGreaterThanOrEqual(2);
+    expect(events.some((e) => e.newValue === 'counter_offer')).toBe(true);
+    expect(events.some((e) => e.newValue === 'accepted')).toBe(true);
   });
 
   test('phases 9–11 — under contract, due diligence, settlement milestones', async ({
@@ -149,6 +169,10 @@ test.describe('Buyer agent demo flow', () => {
     const afterDd = await fetchDeal(request, dealId);
     const completed = afterDd.checklist.filter((i) => i.status === 'completed').length;
     expect(completed).toBeGreaterThanOrEqual(1);
+
+    await patchDeal(request, dealId, { status: 'unconditional' });
+    const afterUnconditional = await fetchDeal(request, dealId);
+    expect(afterUnconditional.deal.status).toBe('unconditional');
   });
 
   test('expose ids for optional UI smoke run', async ({}, testInfo) => {

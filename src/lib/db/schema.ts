@@ -350,6 +350,29 @@ export const dealContactsTable = pgTable("deal_contacts", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
+export const dealOfferEventsTable = pgTable("deal_offer_events", {
+  id: serial("id").primaryKey(),
+  dealId: integer("deal_id")
+    .references(() => dealsTable.id)
+    .notNull(),
+  eventType: text("event_type").notNull(),
+  previousValue: text("previous_value"),
+  newValue: text("new_value"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const propertyOutreachTable = pgTable("property_outreach", {
+  id: serial("id").primaryKey(),
+  propertyId: text("property_id")
+    .references(() => propertiesTable.id)
+    .notNull(),
+  briefId: integer("brief_id").references(() => buyerBriefsTable.id),
+  templateId: text("template_id").notNull(),
+  recipientLabel: text("recipient_label"),
+  status: text("status").default("logged"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
 export const dealDocumentsTable = pgTable("deal_documents", {
   id: serial("id").primaryKey(),
   dealId: integer("deal_id").references(() => dealsTable.id),
@@ -439,6 +462,22 @@ export const dealsRelations = relations(dealsTable, ({ one, many }) => ({
   milestones: many(dealMilestonesTable),
   contacts: many(dealContactsTable),
   documents: many(dealDocumentsTable),
+  offerEvents: many(dealOfferEventsTable),
+}));
+
+export const dealOfferEventsRelations = relations(dealOfferEventsTable, ({ one }) => ({
+  deal: one(dealsTable, { fields: [dealOfferEventsTable.dealId], references: [dealsTable.id] }),
+}));
+
+export const propertyOutreachRelations = relations(propertyOutreachTable, ({ one }) => ({
+  property: one(propertiesTable, {
+    fields: [propertyOutreachTable.propertyId],
+    references: [propertiesTable.id],
+  }),
+  brief: one(buyerBriefsTable, {
+    fields: [propertyOutreachTable.briefId],
+    references: [buyerBriefsTable.id],
+  }),
 }));
 
 export const dealChecklistItemsRelations = relations(dealChecklistItemsTable, ({ one }) => ({

@@ -31,6 +31,8 @@ describe('validateStatusTransition', () => {
     expect(validateStatusTransition('approved', 'due_diligence')).toBe(true);
     expect(validateStatusTransition('due_diligence', 'offer_made')).toBe(true);
     expect(validateStatusTransition('offer_made', 'under_contract')).toBe(true);
+    expect(validateStatusTransition('under_contract', 'unconditional')).toBe(true);
+    expect(validateStatusTransition('unconditional', 'settled')).toBe(true);
     expect(validateStatusTransition('under_contract', 'settled')).toBe(true);
   });
 

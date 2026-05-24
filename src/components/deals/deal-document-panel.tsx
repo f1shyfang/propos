@@ -10,7 +10,7 @@ import type { DealDocumentRow } from '@/components/deals/deal-document-actions';
 
 export type { DealDocumentRow };
 
-type GenerateType = 'offer' | 'cma';
+type GenerateType = 'offer' | 'cma' | 'invoice';
 
 interface DealDocumentPanelProps {
   dealId: string;
@@ -77,7 +77,12 @@ export function DealDocumentPanel({
     setError(null);
     setGenerating(true);
     try {
-      const path = allowGenerate === 'offer' ? 'generate-offer' : 'generate-cma';
+      const path =
+        allowGenerate === 'offer'
+          ? 'generate-offer'
+          : allowGenerate === 'cma'
+            ? 'generate-cma'
+            : 'generate-invoice';
       const res = await fetch(`/api/deals/${dealId}/documents/${path}`, {
         method: 'POST',
         credentials: 'include',
@@ -142,6 +147,12 @@ export function DealDocumentPanel({
             <button type="button" className="pg-btn pg-btn-sm pg-btn-primary" disabled={generating || uploading} onClick={() => void handleGenerate()}>
               <Icon name="file-text" size={12} />
               {generating ? 'Generating…' : 'Generate CMA PDF'}
+            </button>
+          )}
+          {allowGenerate === 'invoice' && (
+            <button type="button" className="pg-btn pg-btn-sm pg-btn-primary" disabled={generating || uploading} onClick={() => void handleGenerate()}>
+              <Icon name="file-text" size={12} />
+              {generating ? 'Generating…' : 'Generate invoice PDF'}
             </button>
           )}
         </div>
