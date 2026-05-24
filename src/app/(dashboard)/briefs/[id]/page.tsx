@@ -587,14 +587,14 @@ export default function BriefDetailPage() {
                         {filter.minBeds}+ beds
                       </span>
                     )}
-                    <button
+                    {/*<button
                       className="pg-btn pg-btn-sm"
                       style={{ marginLeft: 4 }}
                       onClick={() => setTab("profile")}
                     >
                       <Icon name="sliders" size={11} />
                       Edit profile
-                    </button>
+                    </button>*/}
                   </>
                 )}
                 <div style={{ flex: 1 }} />
