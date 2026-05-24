@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Map, Overlay } from 'pigeon-maps';
 import { Icon } from '@/components/shared/icon';
 import { useQueryStates, parseAsString, parseAsInteger } from 'nuqs';
+import { PropertyDrawer } from '@/components/shared/property-drawer';
 
 const cartoPositron = (x: number, y: number, z: number) =>
   `https://a.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`;
@@ -57,9 +58,12 @@ export function PropertiesView({ initialPins, defaultCenter }: {
   const [pins, setPins] = useState<PropertyPin[]>(initialPins);
   const [activePin, setActivePin] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [drawerPropertyId, setDrawerPropertyId] = useState<string | null>(null);
   const boundsRef = useRef<{ ne: [number, number]; sw: [number, number] } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const fetchPins = useCallback((
     bounds: { ne: [number, number]; sw: [number, number] },
@@ -67,6 +71,11 @@ export function PropertiesView({ initialPins, defaultCenter }: {
   ) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
       setLoading(true);
       const p = new URLSearchParams({
         minLat: String(bounds.sw[0]),
@@ -78,9 +87,12 @@ export function PropertiesView({ initialPins, defaultCenter }: {
         ...(filters.beds ? { beds: String(filters.beds) } : {}),
       });
       try {
-        const res = await fetch(`/api/properties?${p}`);
+        const res = await fetch(`/api/properties?${p}`, { signal: abortControllerRef.current.signal });
         const data = await res.json();
         if (data.pins) setPins(data.pins);
+      } catch (error: any) {
+        if (error.name === 'AbortError') return;
+        console.error('Fetch error:', error);
       } finally {
         setLoading(false);
       }
@@ -115,7 +127,7 @@ export function PropertiesView({ initialPins, defaultCenter }: {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Search bar */}
-      <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--pg-border)' }}>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center p-4 sm:px-6 sm:py-4 gap-3 border-b border-[var(--pg-border)]">
         <form onSubmit={handleSearch} style={{ flex: 1, maxWidth: 480, display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: 'var(--pg-surface)', border: '1px solid var(--pg-border-strong)', borderRadius: 8 }}>
           <Icon name="search" size={14} color="var(--pg-text-dim)" />
           <input
@@ -132,7 +144,24 @@ export function PropertiesView({ initialPins, defaultCenter }: {
           )}
         </form>
         <div style={{ flex: 1 }} />
-        <button className="pg-btn"><Icon name="bookmark" size={13} />Save search</button>
+        {selectedIds.length > 0 && (
+          <a
+            href={`/properties/compare?ids=${selectedIds.join(',')}`}
+            className="pg-btn"
+            style={{
+              textDecoration: 'none',
+              background: 'var(--pg-accent)',
+              color: 'var(--pg-bg)',
+              marginRight: 8
+            }}
+          >
+            <Icon name="bar-chart-2" size={13} />
+            Compare ({selectedIds.length})
+          </a>
+        )}
+        <button className="pg-btn" onClick={() => {
+          import('sonner').then(m => m.toast.success("Search saved!"));
+        }}><Icon name="bookmark" size={13} />Save search</button>
       </div>
 
       {/* Filter chips */}
@@ -154,9 +183,9 @@ export function PropertiesView({ initialPins, defaultCenter }: {
       </div>
 
       {/* Split view */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+      <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* List */}
-        <div style={{ width: 380, flex: '0 0 380px', borderRight: '1px solid var(--pg-border)', overflow: 'auto', background: 'var(--pg-bg)', position: 'relative' }} className="pg-scroll">
+        <div className="w-full md:w-[380px] md:flex-none border-b md:border-b-0 md:border-r border-[var(--pg-border)] overflow-auto bg-[var(--pg-bg)] relative h-[50vh] md:h-auto pg-scroll">
           {loading && (
             <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(250,250,247,0.92)', backdropFilter: 'blur(6px)', padding: '7px 16px', fontSize: 12, color: 'var(--pg-text-faint)', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid var(--pg-border)' }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--pg-accent)', display: 'inline-block' }} />
@@ -170,7 +199,8 @@ export function PropertiesView({ initialPins, defaultCenter }: {
             </div>
           )}
           {pins.map((p, i) => (
-            <a key={p.id} href={p.href} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+            <div key={p.id} style={{ display: 'block', cursor: 'pointer' }}
+              onClick={() => setDrawerPropertyId(p.id)}
               onMouseEnter={() => setActivePin(p.id)}
               onMouseLeave={() => setActivePin(null)}
             >
@@ -181,9 +211,21 @@ export function PropertiesView({ initialPins, defaultCenter }: {
                 borderLeft: activePin === p.id || i === 0 ? '2px solid var(--pg-accent)' : '2px solid transparent',
                 transition: 'background 80ms',
               }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginRight: 8 }} onClick={e => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(p.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(prev => [...prev, p.id]);
+                      else setSelectedIds(prev => prev.filter(id => id !== p.id));
+                    }}
+                    style={{ cursor: 'pointer', width: 16, height: 16 }}
+                  />
+                </div>
                 <div style={{ width: 100, flexShrink: 0, borderRadius: 6, overflow: 'hidden', height: 72, background: `hsl(${(i * 47) % 360}deg 20% 88%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {p.imageUrl
-                    ? <img src={p.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ? /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={p.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     : <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.3)', fontWeight: 500, textTransform: 'capitalize' }}>{p.propertyType ?? 'Property'}</span>
                   }
                 </div>
@@ -212,7 +254,7 @@ export function PropertiesView({ initialPins, defaultCenter }: {
                   </div>
                 </div>
               </div>
-            </a>
+            </div>
           ))}
         </div>
 
@@ -255,9 +297,11 @@ export function PropertiesView({ initialPins, defaultCenter }: {
                             {pin.propertyType && <span style={{ textTransform: 'capitalize' }}>{pin.propertyType}</span>}
                           </div>
                         )}
-                        <a href={pin.href} style={{ display: 'block', marginTop: 10, fontSize: 12.5, color: '#1A1814', fontWeight: 500, textDecoration: 'none', padding: '6px 10px', background: '#F4F3EF', borderRadius: 6, textAlign: 'center' }}>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setDrawerPropertyId(pin.id); }}
+                          style={{ display: 'block', width: '100%', marginTop: 10, fontSize: 12.5, color: '#1A1814', fontWeight: 500, textDecoration: 'none', padding: '6px 10px', background: '#F4F3EF', borderRadius: 6, textAlign: 'center', border: 'none', cursor: 'pointer' }}>
                           View property →
-                        </a>
+                        </button>
                       </div>
                     )}
                     <div
@@ -294,6 +338,14 @@ export function PropertiesView({ initialPins, defaultCenter }: {
           )}
         </div>
       </div>
+      
+      {drawerPropertyId && (
+        <PropertyDrawer 
+          propertyId={drawerPropertyId} 
+          onClose={() => setDrawerPropertyId(null)} 
+          initialProperty={pins.find(p => p.id === drawerPropertyId)}
+        />
+      )}
     </div>
   );
 }

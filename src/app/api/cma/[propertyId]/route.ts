@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { propertiesTable } from '@/lib/db/schema';
-import { eq, and, gte, lte, ne, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, ne } from 'drizzle-orm';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ propertyId: string }> }) {
   const { propertyId } = await params;

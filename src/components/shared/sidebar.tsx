@@ -3,6 +3,7 @@
 import { Icon } from './icon';
 import { Logo } from './logo';
 import type { UserDisplay } from '@/lib/user-display';
+import Link from 'next/link';
 
 interface SidebarProps {
   active?: string;
@@ -16,6 +17,7 @@ const items = [
   { id: 'pipeline', icon: 'pipeline' as const, label: 'Pipeline', href: '/pipeline' },
   { id: 'off-market', icon: 'shield' as const, label: 'Off-Market', href: '/off-market' },
   { id: 'suggestions', icon: 'inbox' as const, label: 'Match Feed', href: '/suggestions' },
+  { id: 'client-suggestions', icon: 'mail' as const, label: 'Client Suggestions', href: '/client-suggestions' },
   { id: 'docs', icon: 'folder' as const, label: 'Documents', href: '/docs' },
 ];
 
@@ -29,84 +31,54 @@ export function Sidebar({ active = 'dashboard', user }: SidebarProps) {
   }
 
   return (
-    <aside style={{
-      width: 220,
-      flex: '0 0 220px',
-      background: 'var(--pg-bg)',
-      borderRight: '1px solid var(--pg-border)',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '18px 14px',
-      height: '100%',
-    }}>
-      <div style={{ padding: '2px 6px 22px' }}>
+    <aside className="hidden md:flex flex-col w-56 flex-shrink-0 bg-[var(--pg-bg)] border-r border-[var(--pg-border)] p-4 h-full">
+      <div className="px-1.5 pb-6">
         <Logo />
       </div>
 
       <button
         onClick={openQuickFind}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 9,
-          padding: '8px 10px',
-          background: 'transparent',
-          border: '1px solid var(--pg-border)',
-          borderRadius: 8,
-          marginBottom: 16,
-          cursor: 'pointer',
-          color: 'var(--pg-text-faint)',
-          fontSize: 12.5,
-          fontFamily: 'var(--pg-font-body)',
-          width: '100%',
-        }}
+        className="flex items-center gap-2 px-2.5 py-2 bg-transparent border border-[var(--pg-border)] rounded-lg mb-4 cursor-pointer text-[var(--pg-text-faint)] text-[12.5px] w-full hover:bg-[var(--pg-bg-2)] hover:text-[var(--pg-text-dim)] transition-colors duration-150 shadow-sm"
       >
         <Icon name="search" size={13} color="currentColor" />
         <span>Quick find</span>
-        <span style={{ marginLeft: 'auto', fontFamily: 'var(--pg-font-mono)', fontSize: 10.5, padding: '0 5px', border: '1px solid var(--pg-border)', borderRadius: 3 }}>⌘K</span>
+        <span className="ml-auto font-mono text-[10.5px] px-1.5 border border-[var(--pg-border)] rounded shadow-sm bg-white">⌘K</span>
       </button>
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <nav className="flex flex-col gap-0.5">
         {items.map(item => (
-          <a key={item.id} href={item.href} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '7px 10px',
-            borderRadius: 6,
-            color: active === item.id ? 'var(--pg-text)' : 'var(--pg-text-dim)',
-            background: active === item.id ? 'var(--pg-bg-2)' : 'transparent',
-            fontSize: 13,
-            fontWeight: active === item.id ? 500 : 400,
-            textDecoration: 'none',
-            cursor: 'pointer',
-          }}>
+          <Link 
+            key={item.id} 
+            href={item.href} 
+            className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] no-underline cursor-pointer transition-colors duration-150
+              ${active === item.id 
+                ? 'text-[var(--pg-text)] bg-[var(--pg-bg-2)] font-medium shadow-sm ring-1 ring-[var(--pg-border)]' 
+                : 'text-[var(--pg-text-dim)] hover:bg-[var(--pg-bg-offset)] hover:text-[var(--pg-text)] font-normal'}`}
+          >
             <Icon name={item.icon} size={15} color="currentColor" strokeWidth={active === item.id ? 1.8 : 1.5} />
             <span>{item.label}</span>
-          </a>
+          </Link>
         ))}
       </nav>
 
-      <div style={{ flex: 1 }} />
+      <div className="flex-1" />
 
       {/* Bottom user section */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 9,
-        paddingTop: 14,
-        borderTop: '1px solid var(--pg-border)',
-      }}>
-        <div className="pg-avatar" style={{ background: '#1A1814', color: '#FAFAF7', borderColor: '#1A1814', flexShrink: 0 }}>
+      <div className="flex items-center gap-2 pt-3.5 mt-2 border-t border-[var(--pg-border)]">
+        <div className="pg-avatar bg-[#1A1814] text-[#FAFAF7] border-[#1A1814] flex-shrink-0">
           {initials}
         </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
-          <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayOrg}</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[12.5px] font-medium whitespace-nowrap overflow-hidden text-ellipsis">{displayName}</div>
+          <div className="text-[11px] text-[var(--pg-text-faint)] whitespace-nowrap overflow-hidden text-ellipsis">{displayOrg}</div>
         </div>
-        <a
+        <Link
           href="/account"
           title="Account settings"
-          style={{ color: 'var(--pg-text-faint)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, borderRadius: 4, textDecoration: 'none', flexShrink: 0 }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--pg-text)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--pg-text-faint)')}
+          className="text-[var(--pg-text-faint)] hover:text-[var(--pg-text)] hover:bg-[var(--pg-bg-2)] flex items-center justify-center p-1.5 rounded-md no-underline flex-shrink-0 transition-colors duration-150"
         >
           <Icon name="settings" size={14} />
-        </a>
+        </Link>
       </div>
     </aside>
   );

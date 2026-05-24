@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 
 import { FeedbackButtons } from "@/components/shared/feedback-buttons";
 import { Icon } from "@/components/shared/icon";
+import { PropertyThumb } from "@/components/shared/property-thumb";
 
 type Detail = {
   shortlist: {
@@ -13,6 +14,7 @@ type Detail = {
     feedback_text: string | null;
   };
   property: {
+    id: string;
     canonical_address: string;
     suburb: string;
     state: string;
@@ -23,6 +25,7 @@ type Detail = {
     description: string;
     features: string[];
     days_on_market: number | null;
+    main_image_url: string | null;
   };
   cma_records: { id: string; comparable_address: string; sale_price: number; sale_date: string; distance_km: number }[];
   risks: { id: string; risk_type: string; risk_level: string; description: string }[];
@@ -42,12 +45,14 @@ export default function PortalShortlistDetailPage() {
     return <div style={{ padding: 40, color: "var(--pg-text-dim)" }}>Loading property...</div>;
   }
 
+  const propIndex = detail.property.id ? Number(detail.property.id.split("-")[1]) || 0 : 0;
+
   return (
     <div style={{ maxWidth: 1120, margin: "0 auto", padding: "32px 32px 64px" }}>
       <a href="/portal" style={{ color: "var(--pg-text-faint)", fontSize: 12, textDecoration: "none" }}>Back to portal</a>
       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 28, marginTop: 18 }}>
         <div>
-          <div style={{ height: 320, borderRadius: 10, background: "linear-gradient(135deg, #ece6d8, #c8d5dc)" }} />
+          <PropertyThumb seed={propIndex} height={320} style={{ borderRadius: 10 }} imageUrl={detail.property.main_image_url} />
           <h1 className="pg-display" style={{ margin: "24px 0 8px", fontSize: 34 }}>{detail.property.canonical_address}</h1>
           <p style={{ color: "var(--pg-text-dim)", lineHeight: 1.6 }}>{detail.property.description}</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>

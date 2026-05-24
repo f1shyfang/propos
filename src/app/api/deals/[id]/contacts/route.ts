@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  await params;
   const { contactId, ...updates } = await req.json();
   if (!contactId) return NextResponse.json({ error: 'contactId required' }, { status: 400 });
 

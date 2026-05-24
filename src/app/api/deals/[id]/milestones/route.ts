@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  await params;
   const { milestoneId, completed, notes } = await req.json();
   if (!milestoneId) return NextResponse.json({ error: 'milestoneId required' }, { status: 400 });
 

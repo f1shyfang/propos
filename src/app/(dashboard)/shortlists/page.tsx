@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 
 import { Icon } from "@/components/shared/icon";
 
@@ -36,17 +36,17 @@ export default function ShortlistsPage() {
   const [items, setItems] = useState<ShortlistItem[]>([]);
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     const response = await fetch(`/api/shortlists?brief_id=${briefId}`);
     if (response.ok) setItems((await response.json()).data);
-  }
+  }, [briefId]);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("brief_id");
     if (id) setBriefId(id);
   }, []);
 
-  useEffect(() => { void load(); }, [briefId]);
+  useEffect(() => { void load(); }, [load]);
 
   async function share() {
     setBusy(true);

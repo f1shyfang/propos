@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { TopBar } from '@/components/shared/top-bar';
 import { Icon } from '@/components/shared/icon';
 import { MatchScore } from '@/components/shared/match-score';
@@ -62,6 +63,40 @@ export default function PipelinePage() {
     return acc;
   }, {});
 
+  const handleDragEnd = useCallback(async (result: DropResult) => {
+    const { source, destination, draggableId } = result;
+    if (!destination) return;
+    if (source.droppableId === destination.droppableId) return;
+
+    const sourceStatus = source.droppableId;
+    const destStatus = destination.droppableId;
+    const dealId = Number(draggableId);
+
+    // Optimistic update
+    setDeals(prev => prev.map(d => 
+      d.id === dealId ? { ...d, status: destStatus } : d
+    ));
+
+    // API Call
+    try {
+      const res = await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: destStatus })
+      });
+      if (!res.ok) {
+        // Revert on failure
+        setDeals(prev => prev.map(d => 
+          d.id === dealId ? { ...d, status: sourceStatus } : d
+        ));
+      }
+    } catch (err) {
+      setDeals(prev => prev.map(d => 
+        d.id === dealId ? { ...d, status: sourceStatus } : d
+      ));
+    }
+  }, []);
+
   const totalValue = deals.filter(d => !['settled', 'lost', 'withdrawn'].includes(d.status)).reduce((s, d) => s + (d.price ?? d.offerAmount ?? 0), 0);
   const activeCount = deals.filter(d => !['settled', 'lost', 'withdrawn'].includes(d.status)).length;
 
@@ -81,19 +116,36 @@ export default function PipelinePage() {
       />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 24px' }} className="pg-scroll">
-        <div style={{ display: 'flex', gap: 14, height: '100%', minHeight: 600 }}>
-          {COLUMNS.map(status => {
-            const colDeals = byStatus[status] ?? [];
-            const { dot, muted } = COLUMN_CONFIG[status] ?? {};
-            return (
-              <KCol key={status} title={getDealStatusLabel(status)} count={colDeals.length} value={colValue(colDeals)} dot={dot} muted={muted}>
-                {colDeals.map(d => (
-                  <LiveDealCard key={d.id} deal={d} />
-                ))}
-              </KCol>
-            );
-          })}
-        </div>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div style={{ display: 'flex', gap: 14, height: '100%', minHeight: 600 }}>
+            {COLUMNS.map(status => {
+              const colDeals = byStatus[status] ?? [];
+              const { dot, muted } = COLUMN_CONFIG[status] ?? {};
+              return (
+                <KCol key={status} status={status} title={getDealStatusLabel(status)} count={colDeals.length} value={colValue(colDeals)} dot={dot} muted={muted}>
+                  {colDeals.map((d, index) => (
+                    <Draggable key={d.id} draggableId={String(d.id)} index={index}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          style={{
+                            ...provided.draggableProps.style,
+                            opacity: snapshot.isDragging ? 0.8 : 1,
+                            transform: snapshot.isDragging ? `${provided.draggableProps.style?.transform} scale(1.02)` : provided.draggableProps.style?.transform,
+                          }}
+                        >
+                          <LiveDealCard deal={d} />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                </KCol>
+              );
+            })}
+          </div>
+        </DragDropContext>
       </div>
 
       {showNew && <NewDealModal onClose={() => setShowNew(false)} onCreated={() => { load(); setShowNew(false); }} />}
@@ -101,8 +153,8 @@ export default function PipelinePage() {
   );
 }
 
-function KCol({ title, count, value, dot, muted, children }: {
-  title: string; count: number; value: string; dot?: string; muted?: boolean; children: React.ReactNode;
+function KCol({ status, title, count, value, dot, muted, children }: {
+  status: string; title: string; count: number; value: string; dot?: string; muted?: boolean; children: React.ReactNode;
 }) {
   return (
     <div className="pg-kcol" style={{ opacity: muted ? 0.75 : 1 }}>
@@ -113,9 +165,23 @@ function KCol({ title, count, value, dot, muted, children }: {
         <div style={{ flex: 1 }} />
         <span className="pg-mono" style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>{value}</span>
       </div>
-      <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto', flex: 1 }} className="pg-scroll">
-        {children}
-      </div>
+      <Droppable droppableId={status}>
+        {(provided, snapshot) => (
+          <div 
+            ref={provided.innerRef} 
+            {...provided.droppableProps}
+            style={{ 
+              padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto', flex: 1,
+              background: snapshot.isDraggingOver ? 'var(--pg-surface)' : 'transparent',
+              transition: 'background 0.2s ease',
+            }} 
+            className="pg-scroll"
+          >
+            {children}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
     </div>
   );
 }

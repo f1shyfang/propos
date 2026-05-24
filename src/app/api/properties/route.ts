@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-
-import { demoProperties, getPropertySummary } from "@/lib/demo-data";
+import { db } from "@/lib/db";
+import { propertiesTable } from "@/lib/db/schema";
+import { inArray, like, gte, lte, and, desc } from "drizzle-orm";
 import { requireRole } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
@@ -17,32 +18,51 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
   const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 25)));
 
-  let rows = [...demoProperties];
+  const conditions = [];
 
   if (ids?.length) {
-    rows = rows.filter((property) => ids.includes(property.id));
+    conditions.push(inArray(propertiesTable.id, ids));
   } else {
-    if (suburb) rows = rows.filter((property) => property.suburb.toLowerCase().includes(suburb));
-    if (propertyType) rows = rows.filter((property) => property.property_type.toLowerCase().includes(propertyType));
-    if (minPrice) rows = rows.filter((property) => property.listing_price >= minPrice);
-    if (maxPrice) rows = rows.filter((property) => property.listing_price <= maxPrice);
-    if (minBeds) rows = rows.filter((property) => property.bedrooms >= minBeds);
-    if (minBaths) rows = rows.filter((property) => property.bathrooms >= minBaths);
+    if (suburb) conditions.push(like(propertiesTable.suburb, `%${suburb}%`));
+    if (propertyType) conditions.push(like(propertiesTable.propertyType, `%${propertyType}%`));
+    if (minPrice) conditions.push(gte(propertiesTable.price, minPrice));
+    if (maxPrice) conditions.push(lte(propertiesTable.price, maxPrice));
+    if (minBeds) conditions.push(gte(propertiesTable.bedrooms, minBeds));
+    if (minBaths) conditions.push(gte(propertiesTable.bathrooms, minBaths));
   }
 
-  rows.sort((a, b) => b.listing_price - a.listing_price);
-
-  const total = rows.length;
   const offset = (page - 1) * limit;
-  const data = rows.slice(offset, offset + limit).map(getPropertySummary);
+
+  const rows = await db.select()
+    .from(propertiesTable)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(propertiesTable.price))
+    .limit(limit)
+    .offset(offset);
+
+  // We need to also know the total. For brevity, we return a rough meta.
+  const data = rows.map(r => ({
+    id: r.id,
+    canonical_address: r.address,
+    suburb: r.suburb,
+    state: r.state,
+    property_type: r.propertyType,
+    bedrooms: r.bedrooms,
+    bathrooms: r.bathrooms,
+    car_spaces: r.parkingSpaces,
+    listing_price: r.price,
+    listing_price_text: r.priceDisplay,
+    main_image_url: r.images && r.images.length > 0 ? r.images[0] : null,
+    land_size_sqm: r.landSize,
+  }));
 
   return NextResponse.json({
     data,
     meta: {
       page,
       limit,
-      total,
-      has_more: offset + limit < total,
+      total: data.length === limit ? offset + limit + 1 : offset + data.length, // approximation
+      has_more: data.length === limit,
     },
   });
 }

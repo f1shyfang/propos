@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { Icon } from "@/components/shared/icon";
@@ -12,8 +12,11 @@ const dealBreakerOptions = ["ground floor", "main road", "no balcony", "cladding
 
 export default function NewBriefPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiFilledKeys, setAiFilledKeys] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
     client_name: "Sarah Chen & Tom Williams",
     budget_min: 800000,
@@ -58,6 +61,52 @@ export default function NewBriefPage() {
     router.refresh();
   }
 
+  async function handleAudioUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsTranscribing(true);
+    setError(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/briefs/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Transcription failed");
+      const payload = await res.json();
+
+      if (payload.success && payload.data) {
+        // Update form state with extracted structured data
+        setForm(current => ({ ...current, ...payload.data }));
+        
+        // Mark these fields as AI-filled to highlight them to the user
+        const newKeys = new Set<string>();
+        Object.keys(payload.data).forEach(key => newKeys.add(key));
+        setAiFilledKeys(newKeys);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to process audio.");
+    } finally {
+      setIsTranscribing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
+  // Helper to visually identify AI populated fields
+  const renderFieldLabel = (label: string, key: string) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <label className="pg-label" style={{ margin: 0 }}>{label}</label>
+      {aiFilledKeys.has(key) && <span title="AI Extracted"><Icon name="sparkles" size={12} color="var(--pg-primary)" /></span>}
+    </div>
+  );
+
   return (
     <form onSubmit={submit} style={{ maxWidth: 920, margin: "0 auto", padding: "40px 24px 80px" }}>
       <a href="/briefs" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--pg-text-faint)", fontSize: 12, textDecoration: "none", marginBottom: 20 }}>
@@ -75,32 +124,87 @@ export default function NewBriefPage() {
 
       {error && <div className="pg-card-flat" style={{ padding: 14, color: "var(--pg-red)", marginBottom: 18 }}>{error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+      {/* AI Audio Intake Zone */}
+      <section 
+        className="pg-card-flat" 
+        style={{ 
+          padding: 24, 
+          marginBottom: 32, 
+          border: "1px dashed var(--pg-primary)", 
+          background: "var(--pg-bg-2)",
+          display: "flex", 
+          flexDirection: "column", 
+          alignItems: "center", 
+          justifyContent: "center",
+          gap: 12,
+          textAlign: "center"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 48, height: 48, borderRadius: "50%", background: "var(--pg-bg)", color: "var(--pg-primary)" }}>
+          <div className={isTranscribing ? "pg-spin" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon name="mic" size={24} />
+          </div>
+        </div>
+        <div>
+          <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>AI Call Intake</h3>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--pg-text-dim)", maxWidth: 400 }}>
+            Upload a recording of your client intake call. We will automatically transcribe and extract their brief requirements.
+          </p>
+        </div>
+        
+        <input 
+          type="file" 
+          accept="audio/*" 
+          ref={fileInputRef}
+          style={{ display: "none" }}
+          onChange={handleAudioUpload}
+        />
+        <button 
+          type="button"
+          disabled={isTranscribing}
+          onClick={() => fileInputRef.current?.click()} 
+          className="pg-btn pg-btn-primary"
+          style={{ marginTop: 8 }}
+        >
+          {isTranscribing ? "Extracting Requirements..." : "Upload Audio Recording"}
+        </button>
+      </section>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, opacity: isTranscribing ? 0.5 : 1, pointerEvents: isTranscribing ? "none" : "auto" }}>
         <Section title="Client">
-          <label className="pg-label">Client name</label>
+          {renderFieldLabel("Client name", "client_name")}
           <input className="pg-input" value={form.client_name} onChange={(event) => setForm((current) => ({ ...current, client_name: event.target.value }))} />
         </Section>
 
         <Section title="Budget">
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="pg-label">Minimum</label>
+              {renderFieldLabel("Minimum", "budget_min")}
               <input className="pg-input" type="number" value={form.budget_min} onChange={(event) => setForm((current) => ({ ...current, budget_min: Number(event.target.value) }))} />
             </div>
             <div>
-              <label className="pg-label">Maximum</label>
+              {renderFieldLabel("Maximum", "budget_max")}
               <input className="pg-input" type="number" value={form.budget_max} onChange={(event) => setForm((current) => ({ ...current, budget_max: Number(event.target.value) }))} />
             </div>
           </div>
         </Section>
 
         <Section title="Property Requirements">
-          <ChipGroup values={propertyTypes} selected={form.property_types} onToggle={(value) => toggle("property_types", value)} />
+          {renderFieldLabel("Property Types", "property_types")}
+          <div style={{ marginTop: 8 }}>
+            <ChipGroup values={propertyTypes} selected={form.property_types} onToggle={(value) => toggle("property_types", value)} />
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16 }}>
-            <NumberField label="Beds" value={form.min_bedrooms} onChange={(value) => setForm((current) => ({ ...current, min_bedrooms: value }))} />
-            <NumberField label="Baths" value={form.min_bathrooms} onChange={(value) => setForm((current) => ({ ...current, min_bathrooms: value }))} />
             <div>
-              <label className="pg-label">Parking</label>
+              {renderFieldLabel("Beds", "min_bedrooms")}
+              <input className="pg-input" type="number" min={0} value={form.min_bedrooms} onChange={(e) => setForm(c => ({...c, min_bedrooms: Number(e.target.value)}))} />
+            </div>
+            <div>
+              {renderFieldLabel("Baths", "min_bathrooms")}
+              <input className="pg-input" type="number" min={0} value={form.min_bathrooms} onChange={(e) => setForm(c => ({...c, min_bathrooms: Number(e.target.value)}))} />
+            </div>
+            <div>
+              {renderFieldLabel("Parking", "parking")}
               <select className="pg-input" value={form.parking} onChange={(event) => setForm((current) => ({ ...current, parking: event.target.value }))}>
                 <option value="required">Required</option>
                 <option value="nice_to_have">Nice to have</option>
@@ -111,15 +215,24 @@ export default function NewBriefPage() {
         </Section>
 
         <Section title="Locations">
-          <ChipGroup values={suburbOptions} selected={form.preferred_suburbs} onToggle={(value) => toggle("preferred_suburbs", value)} />
+          {renderFieldLabel("Preferred Suburbs", "preferred_suburbs")}
+          <div style={{ marginTop: 8 }}>
+            <ChipGroup values={suburbOptions} selected={form.preferred_suburbs} onToggle={(value) => toggle("preferred_suburbs", value)} />
+          </div>
         </Section>
 
         <Section title="Must-Haves">
-          <ChipGroup values={mustHaveOptions} selected={form.must_haves} onToggle={(value) => toggle("must_haves", value)} />
+          {renderFieldLabel("Must-Haves", "must_haves")}
+          <div style={{ marginTop: 8 }}>
+            <ChipGroup values={mustHaveOptions} selected={form.must_haves} onToggle={(value) => toggle("must_haves", value)} />
+          </div>
         </Section>
 
         <Section title="Deal-Breakers">
-          <ChipGroup values={dealBreakerOptions} selected={form.deal_breakers} onToggle={(value) => toggle("deal_breakers", value)} />
+          {renderFieldLabel("Deal-Breakers", "deal_breakers")}
+          <div style={{ marginTop: 8 }}>
+            <ChipGroup values={dealBreakerOptions} selected={form.deal_breakers} onToggle={(value) => toggle("deal_breakers", value)} />
+          </div>
         </Section>
       </div>
     </form>
@@ -153,11 +266,4 @@ function ChipGroup({ values, selected, onToggle }: { values: string[]; selected:
   );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return (
-    <div>
-      <label className="pg-label">{label}</label>
-      <input className="pg-input" type="number" min={0} value={value} onChange={(event) => onChange(Number(event.target.value))} />
-    </div>
-  );
-}
+

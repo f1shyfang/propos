@@ -1,42 +1,37 @@
 import { NextResponse } from "next/server";
 
-import {
-  demoCMARecords,
-  demoProperties,
-  demoRisks,
-  demoBriefs,
-  computeDemoMatch,
-  getPropertySummary,
-} from "@/lib/demo-data";
+import { db } from "@/lib/db";
+import { propertiesTable, propertyRisksTable, propertyHistoryTable } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { requireRole } from "@/lib/session";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   await requireRole("agent");
 
   const { id } = await params;
-  const property = demoProperties.find((item) => item.id === id);
+  const [property] = await db.select().from(propertiesTable).where(eq(propertiesTable.id, id));
+  
   if (!property) {
     return NextResponse.json({ error: { code: "NOT_FOUND", message: "Property not found" } }, { status: 404 });
   }
+  
+  const risks = await db.select().from(propertyRisksTable).where(eq(propertyRisksTable.propertyId, id));
+  const cma_records = await db.select().from(propertyHistoryTable).where(eq(propertyHistoryTable.propertyId, id));
+
+  // To bridge the UI's expectations for now
+  const uiProperty = {
+    ...property,
+    propertyFinancials: property.propertyFinancials || {},
+    investmentMetrics: property.investmentMetrics || {},
+    risks: risks || [],
+    cma_records: cma_records || [], // Simulated CMA records from history
+  };
 
   return NextResponse.json({
     data: {
-      property: {
-        ...getPropertySummary(property),
-        floor_area_sqm: property.floor_area_sqm,
-        description: property.raw_data.description,
-        features: property.raw_data.features,
-        listing_source: property.listing_source,
-        listing_url: property.listing_url,
-        days_on_market: property.raw_data.days_on_market,
-      },
-      cma_records: demoCMARecords.filter((record) => record.property_id === id),
-      risks: demoRisks.filter((risk) => risk.property_id === id),
-      match_scores: demoBriefs.map((brief) => ({
-        brief_id: brief.id,
-        client_name: brief.client_name,
-        match_score: computeDemoMatch(property, brief).match_score,
-      })),
+      property: uiProperty,
+      cma_records: uiProperty.cma_records,
+      risks: uiProperty.risks,
     },
   });
 }

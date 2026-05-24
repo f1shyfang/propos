@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  await params;
   const { documentId, clientVisible, tag } = await req.json();
   if (!documentId) return NextResponse.json({ error: 'documentId required' }, { status: 400 });
 

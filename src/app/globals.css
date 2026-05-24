@@ -65,6 +65,12 @@ body {
   background: var(--pg-bg);
 }
 
+.pg-glass {
+  background: rgba(250, 250, 247, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 /* Typography */
 .pg-display {
   font-family: var(--pg-font-display);
@@ -127,6 +133,12 @@ body {
   border: 1px solid var(--pg-border);
   border-radius: 10px;
   overflow: hidden;
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+a.pg-card:hover, button.pg-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -8px rgba(20, 18, 12, 0.08);
+  border-color: var(--pg-border-strong);
 }
 .pg-card-flat {
   background: transparent;

@@ -1,4 +1,4 @@
-# Propos
+# Buyers Agent — Hack48
 
 Next.js (App Router, TypeScript, Tailwind v4) + Supabase — unified workspace for Australian buyer's agents.
 

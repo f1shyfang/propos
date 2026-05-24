@@ -87,105 +87,94 @@ export default function OffMarketPage() {
   ).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="flex flex-col h-full bg-[var(--pg-surface)]">
       <TopBar
         eyebrow={`${properties.length} properties · ${overdueCount} follow-up${overdueCount !== 1 ? 's' : ''} overdue`}
         title="Off-Market Hub"
         actions={
-          <button className="pg-btn pg-btn-primary" onClick={() => setShowForm(true)}>
+          <button className="pg-btn pg-btn-primary shadow-sm hover:shadow-md transition-all duration-200" onClick={() => setShowForm(true)}>
             <Icon name="plus" size={13} />Add property
           </button>
         }
       />
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '24px 32px' }} className="pg-scroll">
+      <div className="flex-1 overflow-auto p-6 md:p-8 pg-scroll">
         {/* Filter bar */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+        <div className="flex gap-2 mb-6">
           {(['all', 'pre_market', 'off_market', 'confidential'] as Filter[]).map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`pg-btn pg-btn-sm ${filter === f ? 'pg-btn-accent' : 'pg-btn-ghost'}`}
-              style={{ fontSize: 12, color: filter === f ? undefined : 'var(--pg-text-dim)' }}>
+              className={`pg-btn pg-btn-sm transition-colors duration-200 ${filter === f ? 'pg-btn-accent shadow-sm' : 'pg-btn-ghost text-[var(--pg-text-dim)]'}`}
+            >
               {f === 'all' ? 'All' : f === 'pre_market' ? 'Pre-Market' : f === 'off_market' ? 'Off-Market' : 'Confidential'}
             </button>
           ))}
         </div>
 
-        {loading && <div style={{ color: 'var(--pg-text-dim)', fontSize: 13 }}>Loading…</div>}
+        {loading && <div className="text-[var(--pg-text-dim)] text-sm animate-pulse">Loading…</div>}
 
         {!loading && filtered.length === 0 && (
-          <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--pg-text-faint)' }}>
-            <Icon name="building" size={36} color="var(--pg-text-very-faint)" />
-            <div style={{ fontSize: 15, marginTop: 14, fontWeight: 500 }}>No off-market properties</div>
-            <div style={{ fontSize: 13, marginTop: 6 }}>Add properties you&apos;ve sourced through your network.</div>
-            <button className="pg-btn pg-btn-primary" style={{ marginTop: 16 }} onClick={() => setShowForm(true)}>
+          <div className="py-16 text-center text-[var(--pg-text-faint)] border border-dashed border-[var(--pg-border)] rounded-xl">
+            <div className="flex justify-center mb-3 text-[var(--pg-text-very-faint)]"><Icon name="building" size={36} /></div>
+            <div className="text-[15px] font-medium text-[var(--pg-text-dim)]">No off-market properties</div>
+            <div className="text-[13px] mt-1 text-[var(--pg-text-faint)]">Add properties you&apos;ve sourced through your network.</div>
+            <button className="pg-btn pg-btn-primary mt-4 mx-auto shadow-sm" onClick={() => setShowForm(true)}>
               Add first property
             </button>
           </div>
         )}
 
         {filtered.length > 0 && (
-          <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
-            <div style={{
-              display: 'grid', gridTemplateColumns: '2.5fr 0.9fr 1fr 0.9fr 1fr 0.8fr',
-              padding: '10px 16px', borderBottom: '1px solid var(--pg-border)',
-              fontSize: 10.5, color: 'var(--pg-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500,
-            }}>
+          <div className="pg-card p-0 overflow-hidden shadow-sm">
+            <div className="grid grid-cols-[2.5fr_0.9fr_1fr_0.9fr_1fr_0.8fr] px-4 py-3 border-b border-[var(--pg-border)] text-[10.5px] text-[var(--pg-text-faint)] uppercase tracking-wider font-medium bg-[var(--pg-bg-offset)]">
               <span>Property</span><span>Price guide</span><span>Access</span>
-              <span>Motivation</span><span>Source</span><span style={{ textAlign: 'right' }}>Last contact</span>
+              <span>Motivation</span><span>Source</span><span className="text-right">Last contact</span>
             </div>
             {filtered.map((p, i, a) => {
               const overdue = calcFollowUpOverdue(p.lastContactedAt ? new Date(p.lastContactedAt) : new Date(0), p.accessStatus as never);
               const days = daysSince(p.lastContactedAt);
               return (
-                <div key={p.id} style={{
-                  display: 'grid', gridTemplateColumns: '2.5fr 0.9fr 1fr 0.9fr 1fr 0.8fr',
-                  padding: '12px 16px', alignItems: 'center', fontSize: 13,
-                  borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
-                  background: overdue ? 'rgba(239,68,68,0.03)' : undefined,
-                }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 500 }} className="pg-truncate">{p.address}</span>
-                      {p.confidential && <Icon name="shield" size={11} color="var(--pg-text-faint)" />}
-                      {p.expectedListingDate && <span className="pg-badge pg-badge-purple" style={{ fontSize: 10 }}>Pre-market</span>}
+                <div key={p.id} className={`grid grid-cols-[2.5fr_0.9fr_1fr_0.9fr_1fr_0.8fr] px-4 py-3 items-center text-[13px] hover:bg-[var(--pg-bg-offset)] transition-colors duration-150 ${i < a.length - 1 ? 'border-b border-[var(--pg-border)]' : ''} ${overdue ? 'bg-red-50/50' : ''}`}>
+                  <div className="min-w-0 pr-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium pg-truncate">{p.address}</span>
+                      {p.confidential && <Icon name="shield" size={11} className="text-[var(--pg-text-faint)]" />}
+                      {p.expectedListingDate && <span className="pg-badge pg-badge-purple text-[10px]">Pre-market</span>}
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>
+                    <div className="text-[11.5px] text-[var(--pg-text-dim)] mt-0.5">
                       {p.suburb}{p.state ? `, ${p.state}` : ''}
                       {p.bedrooms != null ? ` · ${p.bedrooms}b` : ''}
                       {p.bathrooms != null ? `/${p.bathrooms}ba` : ''}
                     </div>
                     {p.sellingAgentName && (
-                      <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', marginTop: 2 }}>
+                      <div className="text-[11px] text-[var(--pg-text-faint)] mt-1">
                         Agent: {p.sellingAgentName}
                       </div>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, fontFamily: 'var(--pg-font-mono)' }}>{fmtPrice(p.priceMin, p.priceMax)}</div>
+                  <div className="text-xs font-mono">{fmtPrice(p.priceMin, p.priceMax)}</div>
                   <div>
-                    <span className={`pg-badge ${ACCESS_COLOR[p.accessStatus] ?? ''}`} style={{ fontSize: 11 }}>
+                    <span className={`pg-badge text-[11px] ${ACCESS_COLOR[p.accessStatus] ?? ''}`}>
                       {ACCESS_LABEL[p.accessStatus] ?? p.accessStatus}
                     </span>
                   </div>
                   <div>
-                    <span className={`pg-badge ${MOTIVATION_COLOR[p.vendorMotivation] ?? ''}`} style={{ fontSize: 11 }}>
+                    <span className={`pg-badge text-[11px] ${MOTIVATION_COLOR[p.vendorMotivation] ?? ''}`}>
                       {MOTIVATION_LABEL[p.vendorMotivation] ?? p.vendorMotivation}
                     </span>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>
+                  <div className="text-xs text-[var(--pg-text-dim)] pr-2">
                     {p.sourceType.replace(/_/g, ' ')}
-                    {p.howSourced && <div style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>{p.howSourced}</div>}
+                    {p.howSourced && <div className="text-[11px] text-[var(--pg-text-faint)] mt-0.5">{p.howSourced}</div>}
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 11.5, color: overdue ? 'var(--pg-red)' : 'var(--pg-text-faint)' }}>
+                  <div className="text-right flex flex-col items-end gap-1">
+                    <div className={`text-[11.5px] ${overdue ? 'text-[var(--pg-red)] font-medium' : 'text-[var(--pg-text-faint)]'}`}>
                       {days === null ? 'Never' : `${days}d ago`}
                       {overdue && ' ⚠'}
                     </div>
-                    <button onClick={() => markContacted(p.id)}
-                      className="pg-btn pg-btn-sm pg-btn-ghost" style={{ fontSize: 11, marginTop: 4, color: 'var(--pg-accent)', padding: '2px 6px' }}>
+                    <button onClick={() => markContacted(p.id)} className="pg-btn pg-btn-sm pg-btn-ghost text-[11px] text-[var(--pg-accent)] px-1.5 py-0.5 hover:bg-[var(--pg-bg-2)] transition-colors">
                       Mark contacted
                     </button>
-                    <button onClick={() => deleteProperty(p.id)}
-                      className="pg-btn pg-btn-sm pg-btn-ghost" style={{ fontSize: 11, marginTop: 2, color: 'var(--pg-text-faint)', padding: '2px 6px' }}>
+                    <button onClick={() => deleteProperty(p.id)} className="pg-btn pg-btn-sm pg-btn-ghost text-[11px] text-[var(--pg-text-faint)] px-1.5 py-0.5 hover:bg-[var(--pg-bg-2)] transition-colors">
                       Remove
                     </button>
                   </div>
@@ -211,7 +200,8 @@ function AddOffMarketModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  async function save() {
+  async function save(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     setSaving(true);
     setError('');
     const res = await fetch('/api/off-market', {
@@ -236,73 +226,77 @@ function AddOffMarketModal({ onClose, onCreated }: { onClose: () => void; onCrea
 
   const field = (key: keyof typeof form, label: string, type: string = 'text', placeholder = '') => (
     <div>
-      <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>{label}</label>
+      <label className="block text-xs text-[var(--pg-text-dim)] mb-1.5">{label}</label>
       <input type={type} value={String(form[key])} onChange={e => setForm(f => ({ ...f, [key]: type === 'number' ? e.target.value : e.target.value }))}
-        placeholder={placeholder}
-        style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13, boxSizing: 'border-box' }} />
+        placeholder={placeholder} required={label.includes('*')}
+        className="w-full px-3 py-2 border border-[var(--pg-border)] rounded-md bg-[var(--pg-bg)] text-[var(--pg-text)] text-[13px] focus:outline-none focus:ring-1 focus:ring-[var(--pg-primary)] focus:border-[var(--pg-primary)] transition-shadow" />
     </div>
   );
 
   const select = (key: keyof typeof form, label: string, options: readonly string[], labelFn: (s: string) => string = s => s) => (
     <div>
-      <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>{label}</label>
+      <label className="block text-xs text-[var(--pg-text-dim)] mb-1.5">{label}</label>
       <select value={String(form[key])} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-        style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13 }}>
+        className="w-full px-3 py-2 border border-[var(--pg-border)] rounded-md bg-[var(--pg-bg)] text-[var(--pg-text)] text-[13px] focus:outline-none focus:ring-1 focus:ring-[var(--pg-primary)] focus:border-[var(--pg-primary)] transition-shadow">
         {options.map(o => <option key={o} value={o}>{labelFn(o)}</option>)}
       </select>
     </div>
   );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '40px 0' }} onClick={onClose}>
-      <div style={{ background: 'var(--pg-bg)', borderRadius: 12, padding: '28px', width: 520, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
-        <h2 className="pg-display" style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>Add off-market property</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+    <div className="fixed inset-0 bg-black/40 z-[1000] flex items-start justify-center overflow-y-auto py-10 backdrop-blur-sm transition-all" onClick={onClose}>
+      <div className="bg-[var(--pg-bg)] rounded-xl p-8 w-[520px] max-w-[90vw] shadow-2xl m-auto" onClick={e => e.stopPropagation()}>
+        <h2 className="pg-display m-0 mb-6 text-xl font-semibold">Add off-market property</h2>
+        
+        {/* Converted to a semantic form */}
+        <form onSubmit={save} className="flex flex-col gap-4">
+          <div className="grid grid-cols-[2fr_1fr] gap-3">
             {field('address', 'Address *', 'text', '12 Smith St')}
             {field('suburb', 'Suburb *', 'text', 'Richmond')}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div className="grid grid-cols-3 gap-3">
             {field('state', 'State', 'text', 'VIC')}
             {field('bedrooms', 'Bedrooms', 'number', '3')}
             {field('bathrooms', 'Bathrooms', 'number', '2')}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="grid grid-cols-2 gap-3">
             {field('priceMin', 'Price min', 'number', '900000')}
             {field('priceMax', 'Price max', 'number', '1100000')}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="grid grid-cols-2 gap-3">
             {select('sourceType', 'Source type', SOURCE_TYPES, s => s.replace(/_/g, ' '))}
             {field('howSourced', 'How sourced', 'text', 'Via selling agent at open home')}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="grid grid-cols-2 gap-3">
             {select('accessStatus', 'Access status', ACCESS_STATUSES, s => s.replace(/_/g, ' '))}
             {select('vendorMotivation', 'Vendor motivation', VENDOR_MOTIVATIONS, s => s.replace(/_/g, ' '))}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div className="grid grid-cols-3 gap-3">
             {field('sellingAgentName', 'Selling agent name')}
             {field('sellingAgentPhone', 'Phone')}
             {field('sellingAgentEmail', 'Email')}
           </div>
           {field('expectedListingDate', 'Expected listing date (pre-market)', 'date')}
           <div>
-            <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>Internal notes</label>
+            <label className="block text-xs text-[var(--pg-text-dim)] mb-1.5">Internal notes</label>
             <textarea value={form.internalNotes} onChange={e => setForm(f => ({ ...f, internalNotes: e.target.value }))}
               rows={3} placeholder="Vendor wants quick settlement, motivated to sell by end of financial year…"
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13, resize: 'none', boxSizing: 'border-box', fontFamily: 'var(--pg-font-body)' }} />
+              className="w-full px-3 py-2 border border-[var(--pg-border)] rounded-md bg-[var(--pg-bg)] text-[var(--pg-text)] text-[13px] resize-y font-sans focus:outline-none focus:ring-1 focus:ring-[var(--pg-primary)] focus:border-[var(--pg-primary)] transition-shadow" />
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.confidential} onChange={e => setForm(f => ({ ...f, confidential: e.target.checked }))} style={{ accentColor: 'var(--pg-accent)' }} />
-            Mark as confidential (visible only to you and agency owner)
+          <label className="flex items-center gap-2 text-[13px] cursor-pointer mt-1 group">
+            <input type="checkbox" checked={form.confidential} onChange={e => setForm(f => ({ ...f, confidential: e.target.checked }))} className="accent-[var(--pg-accent)] w-4 h-4 rounded border-gray-300 focus:ring-[var(--pg-accent)]" />
+            <span className="group-hover:text-[var(--pg-text)] transition-colors">Mark as confidential (visible only to you and agency owner)</span>
           </label>
-          {error && <div style={{ fontSize: 12, color: 'var(--pg-red)' }}>{error}</div>}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
-            <button className="pg-btn" onClick={onClose}>Cancel</button>
-            <button className="pg-btn pg-btn-primary" onClick={save} disabled={saving}>
+          
+          {error && <div className="text-xs text-[var(--pg-red)] bg-red-50 p-2 rounded">{error}</div>}
+          
+          <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-[var(--pg-border)]">
+            <button type="button" className="pg-btn hover:bg-[var(--pg-bg-offset)] transition-colors" onClick={onClose}>Cancel</button>
+            <button type="submit" className="pg-btn pg-btn-primary shadow-sm hover:shadow-md transition-all duration-200" disabled={saving}>
               {saving ? 'Adding…' : 'Add property'}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

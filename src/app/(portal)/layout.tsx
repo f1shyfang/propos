@@ -1,14 +1,14 @@
 import { Icon } from '@/components/shared/icon';
+import { PortalNav } from '@/components/portal/portal-nav';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="pg" style={{ width: '100%', minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--pg-bg)' }}>
-      <header style={{
+      <header className="pg-glass" style={{
         position: 'sticky', top: 0, zIndex: 10,
         padding: '18px 32px',
         borderBottom: '1px solid var(--pg-border)',
         display: 'flex', alignItems: 'center', gap: 20,
-        background: 'var(--pg-bg)',
       }}>
         {/* Agent brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -25,20 +25,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </div>
 
         {/* Tabs */}
-        <nav style={{ display: 'flex', gap: 4, marginLeft: 32 }}>
-          {['My properties', 'Settlement', 'Documents', 'My agent'].map((t, i) => (
-            <a key={t} href="#" style={{
-              padding: '7px 12px',
-              borderRadius: 7,
-              fontSize: 13,
-              fontWeight: i === 0 ? 500 : 400,
-              color: i === 0 ? 'var(--pg-text)' : 'var(--pg-text-dim)',
-              background: i === 0 ? 'var(--pg-bg-2)' : 'transparent',
-              cursor: 'pointer',
-              textDecoration: 'none',
-            }}>{t}</a>
-          ))}
-        </nav>
+        <PortalNav />
 
         <div style={{ flex: 1 }} />
 

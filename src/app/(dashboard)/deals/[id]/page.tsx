@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import { MatchScore } from '@/components/shared/match-score';
+import { OfferLetterGenerator } from '@/components/shared/offer-letter-generator';
+import { SettlementTimeline } from '@/components/shared/settlement-timeline';
 import { getDealStatusLabel, getOfferSubStateLabel, DEAL_STATUSES, calcCoolingOffStatus } from '@/lib/deal-utils';
 import { calcStampDuty } from '@/lib/settlement-utils';
 
-type Tab = 'overview' | 'due_diligence' | 'cma' | 'offer' | 'settlement' | 'contacts' | 'documents';
+type Tab = 'overview' | 'due_diligence' | 'cma' | 'offer' | 'settlement' | 'contacts' | 'documents' | 'activity' | 'invoices';
 
 interface Deal {
   id: number; status: string; offerSubState: string | null; offerAmount: number | null;
@@ -57,7 +59,9 @@ export default function DealDetailPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
   const [cma, setCma] = useState<{ comparables: CMAComp[]; estimatedValue: number | null } | null>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -70,6 +74,7 @@ export default function DealDetailPage() {
     setMilestones(data.milestones ?? []);
     setContacts(data.contacts ?? []);
     setDocuments(data.documents ?? []);
+    fetch(`/api/deals/${id}/activity`).then(r=>r.ok?r.json():null).then(d=>d&&setActivities(d.activity ?? []));
     setLoading(false);
   }, [id]);
 
@@ -79,7 +84,10 @@ export default function DealDetailPage() {
     if (deal && tab === 'cma') {
       fetch(`/api/cma/${deal.propertyId}`).then(r => r.ok ? r.json() : null).then(d => d && setCma(d));
     }
-  }, [deal, tab]);
+    if (deal && tab === 'invoices') {
+      fetch(`/api/deals/${id}/invoices`).then(r => r.ok ? r.json() : null).then(d => d && setInvoices(d.invoices ?? []));
+    }
+  }, [deal, tab, id]);
 
   async function updateDeal(patch: Record<string, unknown>) {
     setSaving(true);
@@ -132,6 +140,8 @@ export default function DealDetailPage() {
     ['settlement', 'Settlement'],
     ['contacts', 'Contacts'],
     ['documents', 'Documents'],
+    ['activity', 'Activity Feed'],
+    ['invoices', 'Invoices'],
   ];
 
   return (
@@ -338,9 +348,33 @@ export default function DealDetailPage() {
           </div>
         )}
 
+
+        {/* ACTIVITY TAB */}
+        {tab === 'activity' && (
+          <div className="pg-card-flat" style={{ padding: '24px 32px' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Client Activity Feed</h3>
+            {activities.length === 0 ? (
+              <div style={{ color: 'var(--pg-text-dim)', fontSize: 13 }}>No recent activity.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {activities.map(a => (
+                  <div key={a.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--pg-accent)', marginTop: 6 }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{a.actionType.replace(/_/g, ' ')}</div>
+                      <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>Entity: {a.entityType}</div>
+                      <div style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>{new Date(a.createdAt).toLocaleString('en-AU')}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* OFFER TAB */}
         {tab === 'offer' && (
-          <OfferTab deal={deal} onSave={updateDeal} saving={saving} />
+          <OfferTab dealId={id} deal={deal} onSave={updateDeal} saving={saving} />
         )}
 
         {/* SETTLEMENT TAB */}
@@ -357,13 +391,18 @@ export default function DealDetailPage() {
         {tab === 'documents' && (
           <DocumentsTab dealId={id} documents={documents} onRefresh={load} />
         )}
+
+        {/* INVOICES TAB */}
+        {tab === 'invoices' && (
+          <InvoicesTab dealId={id} invoices={invoices} onRefresh={load} />
+        )}
       </div>
     </div>
   );
 }
 
 // ── Offer Tab ─────────────────────────────────────────────────────────────────
-function OfferTab({ deal, onSave, saving }: { deal: Deal; onSave: (p: Record<string, unknown>) => Promise<void>; saving: boolean }) {
+function OfferTab({ dealId, deal, onSave, saving }: { dealId: string; deal: Deal; onSave: (p: Record<string, unknown>) => Promise<void>; saving: boolean }) {
   const [amount, setAmount] = useState(String(deal.offerAmount ?? ''));
   const [subState, setSubState] = useState(deal.offerSubState ?? 'draft');
   const [conditions, setConditions] = useState<string[]>(deal.offerConditions ?? []);
@@ -383,7 +422,7 @@ function OfferTab({ deal, onSave, saving }: { deal: Deal; onSave: (p: Record<str
   const deposit = amount ? Math.round(Number(amount.replace(/[^0-9]/g, '')) * 0.1) : 0;
 
   return (
-    <div style={{ maxWidth: 640 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
       <div className="pg-card" style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div>
           <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 6 }}>Offer amount</label>
@@ -395,7 +434,7 @@ function OfferTab({ deal, onSave, saving }: { deal: Deal; onSave: (p: Record<str
           <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 6 }}>Offer status</label>
           <select value={subState} onChange={e => setSubState(e.target.value)}
             style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 13 }}>
-            {['draft', 'sent', 'negotiating', 'counter_offer', 'accepted', 'rejected'].map(s => (
+            {['draft', 'sent', 'negotiating', 'counter_offer', 'under_contract', 'unconditional', 'accepted', 'rejected'].map(s => (
               <option key={s} value={s}>{getOfferSubStateLabel(s)}</option>
             ))}
           </select>
@@ -427,6 +466,10 @@ function OfferTab({ deal, onSave, saving }: { deal: Deal; onSave: (p: Record<str
         <button className="pg-btn pg-btn-primary" onClick={save} disabled={saving} style={{ alignSelf: 'flex-start' }}>
           {saving ? 'Saving…' : 'Save offer details'}
         </button>
+      </div>
+
+      <div style={{ height: "100%" }}>
+        <OfferLetterGenerator dealId={dealId} />
       </div>
     </div>
   );
@@ -490,39 +533,7 @@ function SettlementTab({ deal, milestones, onToggle, onSave, saving, daysToSettl
 
       {/* Milestone timeline */}
       {milestones.length > 0 && (
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--pg-text-faint)', marginBottom: 12 }}>
-            Milestone timeline · {milestones.filter(m => m.status === 'completed').length}/{milestones.length} complete
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {milestones.map((m, i) => {
-              const overdue = m.dueDate && m.status !== 'completed' && new Date(m.dueDate) < new Date();
-              return (
-                <div key={m.id} style={{ display: 'flex', gap: 14, paddingBottom: 4 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 20, flexShrink: 0 }}>
-                    <button onClick={() => onToggle(m.id, m.status !== 'completed')}
-                      style={{ width: 20, height: 20, borderRadius: 999, border: `2px solid ${m.status === 'completed' ? 'var(--pg-green)' : overdue ? 'var(--pg-red)' : 'var(--pg-border)'}`, background: m.status === 'completed' ? 'var(--pg-green)' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {m.status === 'completed' && <Icon name="check" size={10} color="white" />}
-                    </button>
-                    {i < milestones.length - 1 && <div style={{ flex: 1, width: 2, background: 'var(--pg-border)', minHeight: 24, margin: '2px 0' }} />}
-                  </div>
-                  <div style={{ flex: 1, paddingBottom: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 500, textDecoration: m.status === 'completed' ? 'line-through' : 'none', color: m.status === 'completed' ? 'var(--pg-text-faint)' : 'var(--pg-text)' }}>{m.title}</span>
-                      {overdue && <span className="pg-badge pg-badge-red" style={{ fontSize: 10 }}>Overdue</span>}
-                    </div>
-                    {m.dueDate && (
-                      <div style={{ fontSize: 11.5, color: 'var(--pg-text-faint)', marginTop: 2 }}>
-                        Day {m.dayOffset} · {new Date(m.dueDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                        {m.completedAt && ` · Completed ${new Date(m.completedAt).toLocaleDateString('en-AU')}`}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <SettlementTimeline milestones={milestones} onToggle={onToggle} />
       )}
     </div>
   );
@@ -651,6 +662,70 @@ function DocumentsTab({ dealId, documents, onRefresh }: { dealId: string; docume
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── Invoices Tab ──────────────────────────────────────────────────────────────────
+function InvoicesTab({ dealId, invoices, onRefresh }: { dealId: string; invoices: any[]; onRefresh: () => Promise<void> }) {
+  const [loading, setLoading] = useState(false);
+
+  async function generateFinalInvoice() {
+    setLoading(true);
+    await fetch(`/api/deals/${dealId}/invoices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: 15000, description: 'Final Settlement Fee' }) // Dummy data for demo
+    });
+    await onRefresh();
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ maxWidth: 800 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <h2 className="pg-display" style={{ margin: '0 0 4px', fontSize: 20 }}>Invoices</h2>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--pg-text-dim)' }}>Manage and generate invoices for this deal.</p>
+        </div>
+        <button onClick={generateFinalInvoice} disabled={loading} className="pg-btn pg-btn-primary">
+          <Icon name="file-text" size={14} /> {loading ? 'Generating...' : 'Generate Final Invoice'}
+        </button>
+      </div>
+
+      {invoices.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', background: 'var(--pg-bg-offset)', borderRadius: 12, border: '1px dashed var(--pg-border)' }}>
+          <Icon name="file-text" size={32} />
+          <p style={{ margin: '12px 0 0', fontSize: 14, color: 'var(--pg-text-faint)' }}>No invoices generated yet.</p>
+        </div>
+      ) : (
+        <div className="pg-card p-0 overflow-hidden">
+          <table className="pg-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map(inv => (
+                <tr key={inv.id}>
+                  <td>{new Date(inv.createdAt).toLocaleDateString()}</td>
+                  <td>{inv.description}</td>
+                  <td>${inv.amount.toLocaleString()}</td>
+                  <td><span className={`pg-badge ${inv.status === 'paid' ? 'pg-badge-green' : 'pg-badge-amber'}`}>{inv.status}</span></td>
+                  <td style={{ textAlign: 'right' }}>
+                    <a href={inv.generatedPdfUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--pg-primary)', textDecoration: 'none', fontWeight: 500 }}>Download PDF</a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

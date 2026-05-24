@@ -1,6 +1,6 @@
 export const DEAL_STATUSES = [
   'suggested', 'approved', 'due_diligence', 'offer_made',
-  'under_contract', 'settled', 'lost', 'withdrawn',
+  'under_contract', 'unconditional', 'settled', 'lost', 'withdrawn',
 ] as const;
 
 export const OFFER_SUB_STATES = [
@@ -16,6 +16,7 @@ const DEAL_STATUS_LABELS: Record<string, string> = {
   due_diligence: 'Due Diligence',
   offer_made: 'Offer Made',
   under_contract: 'Under Contract',
+  unconditional: 'Unconditional',
   settled: 'Settled',
   lost: 'Lost',
   withdrawn: 'Withdrawn',

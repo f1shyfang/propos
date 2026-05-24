@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { demoShortlists, getShortlistItem, logDemoAction, type FeedbackStatus } from "@/lib/demo-data";
 import { requireRole } from "@/lib/session";
+import { db } from "@/lib/db";
+import { userActionsTable } from "@/lib/db/schema";
 
 const allowed = new Set(["interested", "need_more_info", "not_for_me"]);
 
@@ -28,6 +30,14 @@ export async function POST(req: NextRequest) {
   shortlist.feedback_status = feedbackStatus as FeedbackStatus;
   shortlist.feedback_text = body.feedback_text ?? body.feedbackText ?? null;
   shortlist.feedback_at = now;
+
+  await db.insert(userActionsTable).values({
+    userId: profile.id,
+    actionType: "feedback_submit",
+    entityType: "shortlist",
+    entityId: shortlist.id,
+    metadata: { feedback_status: shortlist.feedback_status }
+  }).catch(console.error);
 
   logDemoAction({
     user_id: profile.id,

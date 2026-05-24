@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { Icon } from "@/components/shared/icon";
@@ -39,16 +39,16 @@ export default function BriefMatchesPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     const [matchesRes, shortlistRes] = await Promise.all([
       fetch(`/api/briefs/${params.id}/matches?min_score=1&limit=25`),
       fetch(`/api/shortlists?brief_id=${params.id}`),
     ]);
     if (matchesRes.ok) setMatches((await matchesRes.json()).data);
     if (shortlistRes.ok) setShortlist((await shortlistRes.json()).data);
-  }
+  }, [params.id]);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   async function addToShortlist(propertyId: string) {
     setBusy(propertyId);

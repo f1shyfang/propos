@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 import { Icon } from "@/components/shared/icon";
+import { PropertyThumb } from "@/components/shared/property-thumb";
+import { ShortlistButton } from "@/components/properties/shortlist-button";
+import { ContactAgentCard } from "@/components/properties/contact-agent-card";
 import { demoCMARecords, demoProperties, demoRisks, formatCurrency } from "@/lib/demo-data";
 
 export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -11,14 +15,22 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   const cma = demoCMARecords.filter((item) => item.property_id === id);
   const risks = demoRisks.filter((item) => item.property_id === id);
 
+  const propIndex = property.id ? Number(property.id.split("-")[1]) || 0 : 0;
+
   return (
     <div style={{ padding: "28px 32px 48px", maxWidth: 1120 }}>
-      <a href="/properties" style={{ color: "var(--pg-text-faint)", fontSize: 12, textDecoration: "none" }}>Properties</a>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <a href="/properties" style={{ color: "var(--pg-text-faint)", fontSize: 12, textDecoration: "none" }}>Properties</a>
+        <div style={{ display: 'flex', gap: 8 }}>
+           <ShortlistButton propertyId={id} />
+           <Link href={`/properties/${id}/cma`} className="pg-btn">
+             <Icon name="file" size={14} /> Generate CMA
+           </Link>
+        </div>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 28, marginTop: 14 }}>
         <div>
-          <div style={{ height: 340, borderRadius: 10, background: "linear-gradient(135deg, #e9e3d6, #c5d3da)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(0,0,0,0.35)", fontWeight: 600, textTransform: "capitalize" }}>
-            {property.property_type}
-          </div>
+          <PropertyThumb seed={propIndex} height={340} style={{ borderRadius: 10 }} imageUrl={property.main_image_url} />
           <h1 className="pg-display" style={{ margin: "24px 0 8px", fontSize: 34 }}>{property.canonical_address}</h1>
           <p style={{ color: "var(--pg-text-dim)", lineHeight: 1.6 }}>{property.raw_data.description}</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
@@ -36,6 +48,8 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               <span><Icon name="car" size={13} /> {property.car_spaces} car</span>
             </div>
           </div>
+          
+          <ContactAgentCard propertyId={id} />
 
           <div className="pg-card-flat" style={{ padding: 18 }}>
             <h2 className="pg-display" style={{ margin: "0 0 12px", fontSize: 18 }}>Risk badges</h2>

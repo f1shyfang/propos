@@ -75,7 +75,7 @@ export function VoiceAgent() {
 
       setAgentReply(reply);
       speak(reply);
-    } catch (err) {
+    } catch {
       setError('Could not reach the voice agent. Please try again.');
     } finally {
       setIsProcessing(false);
