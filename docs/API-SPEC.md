@@ -5,6 +5,7 @@
 
 > References the Supabase data model: `properties`, `buyer_briefs`, `match_scores`, `shortlists` (flat table, grouped by `buyer_brief_id`), `cma_records` (CMA comparables), `risk_overlays` (risk data), `profiles`. See `DATA-MODEL.md` for full column definitions.
 
+
 ---
 
 ## 1. Auth Endpoints (Supabase SDK — Client-Side Only)
