@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { buyerBriefsTable, propertiesTable, shortlistsTable } from '@/lib/db/schema';
-import { eq, desc, and, gte, lte, inArray } from 'drizzle-orm';
-import { computeMatchScore } from '@/lib/match-score';
+import { eq, desc } from 'drizzle-orm';
 import { scoreToMatchPct, formatPrice } from '@/lib/utils';
+import {
+  briefRowToCriteria,
+  buildPropertyMatchConditions,
+  scoreAndRankProperties,
+} from '@/lib/match-properties-for-brief';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,76 +46,33 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     } : null,
   }));
 
-  // Get matched properties (scored against brief)
-  const suburbs = (brief.suburbs as string[]) ?? [];
-  const propTypes = (brief.propertyTypes as string[]) ?? [];
+  const criteria = briefRowToCriteria(brief);
+  const whereClause = buildPropertyMatchConditions(criteria);
 
-  let candidates = await db.select().from(propertiesTable)
-    .where(
-      and(
-        brief.budgetMin ? gte(propertiesTable.price, brief.budgetMin) : undefined,
-        brief.budgetMax ? lte(propertiesTable.price, brief.budgetMax) : undefined,
-      )
-    )
-    .orderBy(desc(propertiesTable.overallScore))
-    .limit(200);
+  const candidates = await db
+    .select()
+    .from(propertiesTable)
+    .where(whereClause);
 
-  // Apply suburb and type filters in JS (case-insensitive)
-  if (suburbs.length > 0) {
-    candidates = candidates.filter(p =>
-      suburbs.some(s => p.suburb?.toLowerCase().includes(s.toLowerCase()))
-    );
-  }
-  if (propTypes.length > 0) {
-    candidates = candidates.filter(p =>
-      propTypes.some(t => p.propertyType?.toLowerCase().includes(t.toLowerCase()))
-    );
-  }
+  const ranked = scoreAndRankProperties(candidates, criteria, 50);
 
-  const matches = candidates.map(p => {
-    const briefForMatch = {
-      budgetMin: brief.budgetMin ?? 0,
-      budgetMax: brief.budgetMax ?? 99_000_000,
-      suburbs: suburbs.length ? suburbs : [p.suburb ?? ''],
-      propertyTypes: propTypes.length ? propTypes : [p.propertyType ?? ''],
-      minBeds: brief.minBeds ?? 0,
-      minBaths: brief.minBaths ?? 0,
-      parking: (brief.parking as 'required' | 'nice_to_have' | 'not_needed') ?? 'nice_to_have',
-      mustHaves: (brief.mustHaves as string[]) ?? [],
-      dealBreakers: (brief.dealBreakers as string[]) ?? [],
-    };
-    const propertyForMatch = {
-      price: p.price ?? 0,
-      suburb: p.suburb ?? '',
-      propertyType: p.propertyType ?? '',
-      bedrooms: p.bedrooms ?? 0,
-      bathrooms: p.bathrooms ?? 0,
-      parkingSpaces: p.parkingSpaces,
-      features: [],
-      daysOnMarket: p.days,
-    };
-    const matchScore = computeMatchScore(propertyForMatch, briefForMatch);
-    return {
-      id: p.id,
-      address: p.address,
-      suburb: p.suburb,
-      state: p.state,
-      price: formatPrice(p.price, p.priceDisplay),
-      priceRaw: p.price,
-      propertyType: p.propertyType,
-      bedrooms: p.bedrooms,
-      bathrooms: p.bathrooms,
-      parkingSpaces: p.parkingSpaces,
-      days: p.days,
-      score: matchScore,
-      overallScore: scoreToMatchPct(p.overallScore),
-      underOffer: !!p.underOffer,
-      href: `/properties/${p.id}`,
-    };
-  })
-    .filter(m => m.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 50);
+  const matches = ranked.map(({ row: p, matchScore }) => ({
+    id: p.id,
+    address: p.address,
+    suburb: p.suburb,
+    state: p.state,
+    price: formatPrice(p.price, p.priceDisplay),
+    priceRaw: p.price,
+    propertyType: p.propertyType,
+    bedrooms: p.bedrooms,
+    bathrooms: p.bathrooms,
+    parkingSpaces: p.parkingSpaces,
+    days: p.days,
+    score: matchScore,
+    overallScore: scoreToMatchPct(p.overallScore),
+    underOffer: !!p.underOffer,
+    href: `/properties/${p.id}`,
+  }));
 
   return NextResponse.json({ brief, shortlist, matches });
 }

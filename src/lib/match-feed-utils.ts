@@ -1,4 +1,6 @@
 import { computeMatchScore } from './match-score';
+import { briefLikeToCriteria, propertyRowToMatchInput } from './match-properties-for-brief';
+import { propertyTypesMatch } from './property-type-utils';
 
 export interface MatchFeedBrief {
   id: number;
@@ -57,33 +59,23 @@ export function buildMatchFeedItems(
   for (const brief of briefs) {
     if (!ACTIVE_STATUSES.has(brief.status ?? '')) continue;
 
-    const briefForMatch = {
-      budgetMin: brief.budgetMin ?? 0,
-      budgetMax: brief.budgetMax ?? Infinity,
-      suburbs: brief.suburbs ?? [],
-      propertyTypes: brief.propertyTypes ?? [],
-      minBeds: brief.minBeds ?? 0,
-      minBaths: brief.minBaths ?? 0,
-      parking: (brief.parking as 'required' | 'nice_to_have' | 'not_needed') ?? 'not_needed',
-      mustHaves: brief.mustHaves ?? [],
-      dealBreakers: brief.dealBreakers ?? [],
-    };
+    const criteria = briefLikeToCriteria({
+      budgetMin: brief.budgetMin,
+      budgetMax: brief.budgetMax,
+      suburbs: brief.suburbs,
+      propertyTypes: brief.propertyTypes,
+      minBeds: brief.minBeds,
+      minBaths: brief.minBaths,
+      parking: brief.parking,
+      mustHaves: brief.mustHaves,
+      dealBreakers: brief.dealBreakers,
+    });
 
     for (const prop of properties) {
       if (!prop.suburb || !prop.propertyType || !prop.price) continue;
+      if (!propertyTypesMatch(criteria.propertyTypes, prop.propertyType)) continue;
 
-      const propForMatch = {
-        price: prop.price,
-        suburb: prop.suburb,
-        propertyType: prop.propertyType,
-        bedrooms: prop.bedrooms ?? 0,
-        bathrooms: prop.bathrooms ?? 0,
-        parkingSpaces: prop.parkingSpaces,
-        features: [],
-        daysOnMarket: prop.days,
-      };
-
-      const score = computeMatchScore(propForMatch, briefForMatch);
+      const score = computeMatchScore(propertyRowToMatchInput(prop), criteria);
       if (score === 0) continue;
 
       items.push({

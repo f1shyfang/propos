@@ -1,3 +1,5 @@
+import { propertyTypesMatch, suburbMatches } from '@/lib/property-type-utils';
+
 export interface BuyerBrief {
   budgetMin: number;
   budgetMax: number;
@@ -25,8 +27,8 @@ export interface PropertyForMatch {
 export function computeMatchScore(property: PropertyForMatch, brief: BuyerBrief): number {
   // Hard filters
   if (property.price < brief.budgetMin || property.price > brief.budgetMax) return 0;
-  if (!brief.propertyTypes.map(t => t.toLowerCase()).includes(property.propertyType.toLowerCase())) return 0;
-  if (!brief.suburbs.map(s => s.toLowerCase()).includes(property.suburb.toLowerCase())) return 0;
+  if (!propertyTypesMatch(brief.propertyTypes, property.propertyType)) return 0;
+  if (!suburbMatches(brief.suburbs, property.suburb)) return 0;
   if (property.bedrooms < brief.minBeds) return 0;
   if (property.bathrooms < brief.minBaths) return 0;
   if (brief.dealBreakers.some(db => property.features.includes(db))) return 0;
