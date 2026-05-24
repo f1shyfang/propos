@@ -2,21 +2,18 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { useQueryState } from "nuqs";
 import { Icon } from "@/components/shared/icon";
 import { MatchScore } from "@/components/shared/match-score";
 import { PropertyThumb } from "@/components/shared/property-thumb";
 import { ViewToggle, type ViewMode } from "@/components/shared/view-toggle";
 import { BriefMatchesMapView } from "@/components/briefs/brief-matches-map-view";
-import { ShortlistDealButton } from "@/components/deals/shortlist-deal-button";
 import {
   generateDefaultRoadmap,
-  calcRoadmapDates,
   shiftRoadmapStart,
   type RoadmapMilestone,
 } from "@/lib/roadmap-utils";
-// import { generateDefaultRoadmap, calcRoadmapDates,  type RoadmapMilestone } from '@/lib/roadmap-utils';
+import { GanttRoadmap } from "@/components/shared/gantt-roadmap";
 
 interface BriefMatch {
   id: string;
@@ -264,7 +261,9 @@ export default function BriefDetailPage() {
       .then((d) => {
         if (d?.suburbs) setSuburbSuggestions(d.suburbs);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [loadBrief, loadMatches]);
 
   useEffect(() => {
@@ -1689,36 +1688,8 @@ function RoadmapTab({
     );
   }
 
-  const overallStart = roadmap[0].startDate;
-  const overallEnd = roadmap[roadmap.length - 1].endDate;
-  const totalSpan = Math.max(
-    1,
-    (overallEnd.getTime() - overallStart.getTime()) / (1000 * 60 * 60 * 24),
-  );
   const totalDays = roadmap.reduce((s, m) => s + m.durationDays, 0);
   const totalWeeks = Math.round(totalDays / 7);
-
-  // Generate week markers
-  const weeks: Date[] = [];
-  const wCursor = new Date(overallStart);
-  while (wCursor <= overallEnd) {
-    weeks.push(new Date(wCursor));
-    wCursor.setDate(wCursor.getDate() + 7);
-  }
-
-  const barColor = (i: number) => {
-    const colors = [
-      "#E5B100",
-      "#22C55E",
-      "#3B82F6",
-      "#F59E0B",
-      "#8B5CF6",
-      "#EF4444",
-      "#14B8A6",
-      "#6366F1",
-    ];
-    return colors[i % colors.length];
-  };
 
   return (
     <div>
@@ -1761,167 +1732,7 @@ function RoadmapTab({
         </button>
       </div>
 
-      <div className="pg-card-flat" style={{ overflow: "hidden" }}>
-        {/* Gantt header */}
-        <div style={{ display: "flex", borderBottom: "1px solid var(--pg-border)", height: 42 }}>
-          <div
-            style={{
-              width: 200,
-              flexShrink: 0,
-              padding: "10px 16px",
-              fontSize: 10.5,
-              color: "var(--pg-text-faint)",
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              borderRight: "1px solid var(--pg-border)",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            Milestone
-          </div>
-          <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-            {weeks.map((w, i) => (
-              <div
-                key={i}
-                style={{
-                  flex: 1,
-                  borderLeft: i === 0 ? "none" : "1px dashed var(--pg-border)",
-                  padding: "6px 4px 0",
-                  fontSize: 10,
-                  color: "var(--pg-text-faint)",
-                  minWidth: 0,
-                  textAlign: "center",
-                  lineHeight: 1.3,
-                }}
-              >
-                <div>{w.getDate()}</div>
-                <div>{w.toLocaleDateString("en-AU", { month: "short" })}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Gantt rows */}
-        {roadmap.map((m, i) => {
-          const offsetDays =
-            (m.startDate.getTime() - overallStart.getTime()) / (1000 * 60 * 60 * 24);
-          const leftPct = (offsetDays / totalSpan) * 100;
-          const widthPct = (m.durationDays / totalSpan) * 100;
-          const color = barColor(i);
-
-          return (
-            <div
-              key={m.id}
-              style={{
-                display: "flex",
-                borderBottom: i < roadmap.length - 1 ? "1px solid var(--pg-border)" : "none",
-                alignItems: "center",
-                minHeight: 52,
-              }}
-            >
-              {/* Label + duration */}
-              <div
-                style={{
-                  width: 200,
-                  flexShrink: 0,
-                  padding: "10px 16px",
-                  borderRight: "1px solid var(--pg-border)",
-                }}
-              >
-                <div style={{ fontWeight: 500, fontSize: 13 }}>{m.label}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
-                  <input
-                    type="number"
-                    min={1}
-                    max={180}
-                    value={m.durationDays}
-                    onChange={(e) =>
-                      onChange(calcRoadmapDates(roadmap, i, Math.max(1, Number(e.target.value))))
-                    }
-                    style={{
-                      width: 44,
-                      padding: "2px 4px",
-                      border: "1px solid var(--pg-border)",
-                      borderRadius: 4,
-                      background: "var(--pg-bg)",
-                      color: "var(--pg-text)",
-                      fontSize: 11,
-                      textAlign: "center",
-                    }}
-                  />
-                  <span style={{ fontSize: 11, color: "var(--pg-text-faint)" }}>days</span>
-                </div>
-              </div>
-
-              {/* Timeline bar area */}
-              <div style={{ flex: 1, position: "relative", height: 52, overflow: "hidden" }}>
-                {/* Week grid lines (vertical) */}
-                {weeks.map((_, wi) => (
-                  <div
-                    key={wi}
-                    style={{
-                      position: "absolute",
-                      left: `${(wi / weeks.length) * 100}%`,
-                      top: 0,
-                      bottom: 0,
-                      width: 1,
-                      borderLeft: wi === 0 ? "none" : "1px dashed var(--pg-border)",
-                    }}
-                  />
-                ))}
-                {/* The bar */}
-                <div
-                  style={{
-                    position: "absolute",
-                    left: `${leftPct}%`,
-                    width: `${widthPct}%`,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    height: 22,
-                    background: color,
-                    borderRadius: 5,
-                    opacity: 0.85,
-                    display: "flex",
-                    alignItems: "center",
-                    padding: "0 8px",
-                    minWidth: 4,
-                  }}
-                >
-                  {widthPct > 12 && (
-                    <span
-                      style={{
-                        fontSize: 10.5,
-                        fontWeight: 600,
-                        color: "#FFF",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {m.durationDays}d
-                    </span>
-                  )}
-                </div>
-                {/* Date range label below bar */}
-                <div
-                  style={{
-                    position: "absolute",
-                    left: `${leftPct}%`,
-                    top: "calc(50% + 14px)",
-                    fontSize: 10,
-                    color: "var(--pg-text-faint)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {m.startDate.toLocaleDateString("en-AU", { day: "numeric", month: "short" })} →{" "}
-                  {m.endDate.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <GanttRoadmap roadmap={roadmap} />
 
       {/* Notes section below chart */}
       <div style={{ marginTop: 20 }}>
@@ -1945,7 +1756,16 @@ function RoadmapTab({
                   width: 10,
                   height: 10,
                   borderRadius: 3,
-                  background: barColor(i),
+                  background: [
+                    "#E5B100",
+                    "#22C55E",
+                    "#3B82F6",
+                    "#F59E0B",
+                    "#8B5CF6",
+                    "#EF4444",
+                    "#14B8A6",
+                    "#6366F1",
+                  ][i % 8],
                   flexShrink: 0,
                 }}
               />

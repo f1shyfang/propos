@@ -52,6 +52,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       suburbs: brief.suburbs,
       budgetMin: brief.budgetMin,
       budgetMax: brief.budgetMax,
+      roadmap: brief.roadmap,
     },
     items,
   });

@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import { PropertyThumb } from '@/components/shared/property-thumb';
+import { GanttRoadmap } from '@/components/shared/gantt-roadmap';
+import type { RoadmapMilestone } from '@/lib/roadmap-utils';
 
 interface ShortlistItem {
   shortlistId: number;
@@ -22,6 +24,7 @@ interface ShortlistItem {
 interface Brief {
   id: number; clientName: string; suburbs: string[];
   budgetMin: number | null; budgetMax: number | null;
+  roadmap?: Array<{ id: string; label: string; startDate: string; endDate: string; durationDays: number; notes: string }>;
 }
 
 const STATUS_BUTTONS = [
@@ -192,6 +195,7 @@ export default function ClientBriefPage() {
   const { id } = useParams<{ id: string }>();
   const [brief, setBrief] = useState<Brief | null>(null);
   const [items, setItems] = useState<ShortlistItem[]>([]);
+  const [roadmap, setRoadmap] = useState<RoadmapMilestone[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -201,6 +205,16 @@ export default function ClientBriefPage() {
     const data = await res.json();
     setBrief(data.brief);
     setItems(data.items ?? []);
+    const rm = data.brief?.roadmap;
+    if (Array.isArray(rm) && rm.length > 0) {
+      setRoadmap(rm.map((m: { id: string; label: string; startDate: string; endDate: string; durationDays: number; notes: string }) => ({
+        id: m.id, label: m.label,
+        startDate: new Date(m.startDate), endDate: new Date(m.endDate),
+        durationDays: m.durationDays, notes: m.notes,
+      })));
+    } else {
+      setRoadmap(null);
+    }
     setLoading(false);
   }, [id]);
 
@@ -313,6 +327,19 @@ export default function ClientBriefPage() {
                 })}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Strategy Roadmap */}
+        {roadmap && (
+          <div style={{ marginTop: 48 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 20 }}>
+              <h2 className="pg-display" style={{ margin: 0, fontSize: 22, fontWeight: 500 }}>Strategy Roadmap</h2>
+              <span style={{ fontSize: 12.5, color: 'var(--pg-text-faint)' }}>
+                {roadmap.length} milestones · ~{Math.round(roadmap.reduce((s, m) => s + m.durationDays, 0) / 7)} weeks total
+              </span>
+            </div>
+            <GanttRoadmap roadmap={roadmap} />
           </div>
         )}
     </div>
