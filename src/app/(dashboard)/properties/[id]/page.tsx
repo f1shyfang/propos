@@ -24,6 +24,47 @@ function calcStampDuty(price: number | null): string {
   return `$${duty.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
 }
 
+const NSW_BASE = 'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services';
+
+async function queryLayer(service: string, layer: number, envelope: string, fields: string): Promise<Record<string, unknown>[]> {
+  const url = `${NSW_BASE}/${service}/MapServer/${layer}/query?geometry=${envelope}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=${fields}&returnGeometry=false&f=json`;
+  try {
+    const res = await fetch(url, { next: { revalidate: 86400 } });
+    const json = await res.json() as { features?: Array<{ attributes: Record<string, unknown> }> };
+    return (json.features ?? []).map(f => f.attributes);
+  } catch {
+    return [];
+  }
+}
+
+type RiskOverlay = {
+  flood: boolean;
+  bushfire: string | null; // e.g. "Vegetation Category 1"
+  heritage: { name: string; type: string } | null;
+  nsw: boolean; // whether data is available (NSW only)
+}
+
+async function fetchRiskOverlay(lat: number, lng: number, state: string | null): Promise<RiskOverlay> {
+  if (state?.toUpperCase() !== 'NSW') return { flood: false, bushfire: null, heritage: null, nsw: false };
+
+  const buf = 0.001;
+  const envelope = `${lng - buf},${lat - buf},${lng + buf},${lat + buf}`;
+
+  const [floodRows, bushfireRows, heritageRows] = await Promise.all([
+    queryLayer('ePlanning/Planning_Portal_Hazard', 230, envelope, 'LAY_CLASS'),
+    queryLayer('ePlanning/Planning_Portal_Hazard', 229, envelope, 'd_Category,d_Guidelin'),
+    queryLayer('ePlanning/Planning_Portal_Principal_Planning', 16, envelope, 'H_NAME,LAY_CLASS'),
+  ]);
+
+  const bushfireCategory = bushfireRows.find(r => r.d_Category && r.d_Category !== 'Vegetation Buffer');
+  return {
+    flood: floodRows.length > 0,
+    bushfire: bushfireCategory ? (bushfireCategory.d_Category as string) : null,
+    heritage: heritageRows.length > 0 ? { name: heritageRows[0].H_NAME as string, type: heritageRows[0].LAY_CLASS as string } : null,
+    nsw: true,
+  };
+}
+
 export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -68,6 +109,8 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       distanceKm: Number(r.distance_km),
     }));
   }
+  const risk = await fetchRiskOverlay(trueLat ?? 0, trueLng ?? 0, p.state);
+
   const price = formatPrice(p.price, p.priceDisplay);
 
   const propTypeLabel = p.propertyType
@@ -352,26 +395,47 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             </div>
           )}
 
-          {/* Risk overlay — static */}
+          {/* Risk overlay */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <span className="pg-label">Risk overlay</span>
-              <span className="pg-badge pg-badge-green" style={{ fontSize: 10 }}>Low overall</span>
+              {risk.nsw && !risk.flood && !risk.bushfire && !risk.heritage && (
+                <span className="pg-badge pg-badge-green" style={{ fontSize: 10 }}>Low overall</span>
+              )}
+              {!risk.nsw && (
+                <span className="pg-badge" style={{ fontSize: 10 }}>NSW only</span>
+              )}
             </div>
             <div className="pg-card-flat" style={{ padding: 14 }}>
               {[
-                { l: 'Flood (1-in-100yr)', s: 'Clear', dot: 'var(--pg-green)' },
-                { l: 'Bushfire BAL', s: 'Not applicable', dot: 'var(--pg-text-very-faint)' },
-                { l: 'Heritage overlay', s: 'Minor', dot: 'var(--pg-amber)' },
-                { l: 'Contaminated land', s: 'Clear', dot: 'var(--pg-green)' },
+                {
+                  l: 'Flood planning area',
+                  s: !risk.nsw ? 'No data' : risk.flood ? 'Affected' : 'Clear',
+                  dot: !risk.nsw ? 'var(--pg-text-very-faint)' : risk.flood ? 'var(--pg-red, #ef4444)' : 'var(--pg-green)',
+                },
+                {
+                  l: 'Bushfire prone land',
+                  s: !risk.nsw ? 'No data' : risk.bushfire ?? 'Clear',
+                  dot: !risk.nsw ? 'var(--pg-text-very-faint)' : risk.bushfire ? 'var(--pg-amber, #f59e0b)' : 'var(--pg-green)',
+                },
+                {
+                  l: 'Heritage overlay',
+                  s: !risk.nsw ? 'No data' : risk.heritage ? (risk.heritage.name ?? risk.heritage.type) : 'None listed',
+                  dot: !risk.nsw ? 'var(--pg-text-very-faint)' : risk.heritage ? 'var(--pg-amber, #f59e0b)' : 'var(--pg-green)',
+                },
               ].map((r, i, a) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 0', fontSize: 12.5, borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none' }}>
-                  <div style={{ width: 6, height: 6, borderRadius: 999, background: r.dot, flexShrink: 0 }} />
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '8px 0', fontSize: 12.5, borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: 999, background: r.dot, flexShrink: 0, marginTop: 4 }} />
                   <span style={{ flex: 1 }}>{r.l}</span>
-                  <span style={{ color: 'var(--pg-text-dim)', fontSize: 12 }}>{r.s}</span>
+                  <span style={{ color: 'var(--pg-text-dim)', fontSize: 12, textAlign: 'right', maxWidth: 120 }}>{r.s}</span>
                 </div>
               ))}
             </div>
+            {risk.nsw && (
+              <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', marginTop: 6, lineHeight: 1.4 }}>
+                Source: NSW ePlanning Spatial Viewer. Flood data may not reflect latest council maps.
+              </div>
+            )}
           </div>
 
           {/* Feasibility */}
