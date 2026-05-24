@@ -348,7 +348,7 @@ export function ParsedBriefReview({
           <Icon name="chevron-left" size={12} />Back
         </button>
         <button type="button" className="pg-btn pg-btn-accent" onClick={onSave} disabled={saving}>
-          {saving ? 'Saving…' : 'Create brief'}
+          {saving ? 'Saving…' : 'Create client'}
         </button>
       </div>
     </div>

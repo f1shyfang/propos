@@ -132,16 +132,16 @@ export default function NewBriefPage() {
   return (
     <form onSubmit={submit} style={{ padding: '40px 32px 80px' }}>
       <a href="/briefs" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--pg-text-faint)', fontSize: 12, textDecoration: 'none', marginBottom: 20 }}>
-        <Icon name="chevron-left" size={12} />Back to briefs
+        <Icon name="chevron-left" size={12} />Back to clients
       </a>
 
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20, marginBottom: 28 }}>
         <div style={{ flex: 1 }}>
-          <h1 className="pg-display" style={{ margin: 0, fontSize: 30 }}>New Buyer Brief</h1>
+          <h1 className="pg-display" style={{ margin: 0, fontSize: 30 }}>New Client</h1>
           <p style={{ margin: '8px 0 0', color: 'var(--pg-text-dim)', fontSize: 14 }}>Fill in the details or upload a call recording to auto-fill.</p>
         </div>
         <button className="pg-btn pg-btn-accent" type="submit" disabled={saving || busy}>
-          {saving ? 'Creating…' : 'Create brief'}
+          {saving ? 'Creating…' : 'Create client'}
         </button>
       </div>
 

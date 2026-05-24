@@ -30,7 +30,7 @@ export default function IntakePage() {
 
   async function runParse(text: string, source: 'audio' | 'text', filename?: string) {
     setPhase('parsing');
-    setStatusMessage('Extracting buyer brief fields…');
+    setStatusMessage('Extracting client fields…');
     setErrors([]);
 
     try {
@@ -128,11 +128,11 @@ export default function IntakePage() {
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 24px 80px' }}>
       <div style={{ marginBottom: 36 }}>
         <a href="/briefs" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--pg-text-faint)', fontSize: 12.5, textDecoration: 'none', marginBottom: 16 }}>
-          <Icon name="chevron-left" size={12} />Back to briefs
+          <Icon name="chevron-left" size={12} />Back to clients
         </a>
         <h1 className="pg-display" style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>Import from recording</h1>
         <p style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--pg-text-dim)' }}>
-          Drop a meeting recording or paste a transcript. We&apos;ll extract a buyer brief for you to review.
+          Drop a meeting recording or paste a transcript. We&apos;ll extract client fields for you to review.
         </p>
       </div>
 

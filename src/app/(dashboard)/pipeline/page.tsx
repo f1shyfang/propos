@@ -966,10 +966,10 @@ function NewDealModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
         <h2 className="pg-display" style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>Create deal</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>Client brief</label>
+            <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>Clients</label>
             <select value={form.briefId} onChange={(e) => setForm((f) => ({ ...f, briefId: e.target.value, propertyId: '' }))}
               className="pg-input" style={{ width: '100%', fontSize: 13 }}>
-              <option value="">Select brief…</option>
+              <option value="">Select client…</option>
               {briefs.map((b) => <option key={b.id} value={b.id}>{b.clientName}</option>)}
             </select>
           </div>
@@ -984,11 +984,11 @@ function NewDealModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
             >
               <option value="">
                 {!form.briefId
-                  ? 'Select a brief first…'
+                  ? 'Select a client first…'
                   : loadingProperties
                     ? 'Loading properties…'
                     : properties.length === 0
-                      ? 'No matching properties for this brief'
+                      ? 'No matching properties for this client'
                       : 'Select property…'}
               </option>
               {properties.map((p) => <option key={p.id} value={p.id}>{formatPropertyOption(p)}</option>)}

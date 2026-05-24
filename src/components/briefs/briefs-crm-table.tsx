@@ -49,8 +49,8 @@ const COLUMNS: ColumnDef[] = [
 ];
 
 const SAVED_VIEWS: Array<{ key: SavedView; label: string }> = [
-  { key: 'all', label: 'All Briefs' },
-  { key: 'active', label: 'My Active Briefs' },
+  { key: 'all', label: 'All Clients' },
+  { key: 'active', label: 'My Active Clients' },
   { key: 'highBudget', label: 'High Budget' },
 ];
 
@@ -281,7 +281,7 @@ export function BriefsCrmTable({ rows: inputRows }: Props) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `buyer-briefs-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `clients-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -343,7 +343,7 @@ export function BriefsCrmTable({ rows: inputRows }: Props) {
         <span className="pg-label">Density</span>
         {(['compact', 'standard', 'comfortable'] as Density[]).map((item) => <button key={item} type="button" className={`pg-btn pg-btn-sm ${density === item ? 'pg-btn-primary' : ''}`} onClick={() => setDensity(item)}>{item}</button>)}
         <span className="pg-badge">Where <strong>Suburbs</strong> contains <strong>{suburb === 'all' ? 'Any' : suburb}</strong></span>
-        {display.hiddenTestRows > 0 && <span style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>{display.hiddenTestRows} generated test brief{display.hiddenTestRows === 1 ? '' : 's'} hidden</span>}
+        {display.hiddenTestRows > 0 && <span style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>{display.hiddenTestRows} generated test client{display.hiddenTestRows === 1 ? '' : 's'} hidden</span>}
         {display.usingDemoRows && <span style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>Showing realistic demo CRM data</span>}
       </div>
 
@@ -467,7 +467,7 @@ function ContextMenu({ row, x, y, close }: { row?: BriefTableRow; x: number; y: 
 }
 
 function EmptyState({ clearFilters }: { clearFilters: () => void }) {
-  return <div style={{ padding: 56, textAlign: 'center', color: 'var(--pg-text-dim)' }}><Icon name="users" size={34} color="var(--pg-text-very-faint)" /><div style={{ marginTop: 12, fontWeight: 600 }}>No briefs match this view.</div><div style={{ marginTop: 4, fontSize: 12 }}>Skeleton loaders can occupy the same grid rows while data is loading.</div><button className="pg-btn pg-btn-sm" type="button" onClick={clearFilters} style={{ marginTop: 14 }}>Clear filters</button></div>;
+  return <div style={{ padding: 56, textAlign: 'center', color: 'var(--pg-text-dim)' }}><Icon name="users" size={34} color="var(--pg-text-very-faint)" /><div style={{ marginTop: 12, fontWeight: 600 }}>No clients match this view.</div><div style={{ marginTop: 4, fontSize: 12 }}>Skeleton loaders can occupy the same grid rows while data is loading.</div><button className="pg-btn pg-btn-sm" type="button" onClick={clearFilters} style={{ marginTop: 14 }}>Clear filters</button></div>;
 }
 
 function PopoverPanels(props: {

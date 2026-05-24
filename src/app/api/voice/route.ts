@@ -8,13 +8,13 @@ const MOCK_RESPONSES: Record<string, string> = {
   'help': "I'm your voice assistant for PropertyGo. Try saying things like 'show me properties in Richmond', 'what's in my pipeline', or 'tell me about the Smith Street deal'.",
   'properties': "You currently have 1,247 properties tracked. 6 are settling this month with a combined value of $11.8 million. Would you like me to filter by location or price range?",
   'pipeline': "Your pipeline has 14 deals across 6 stages, totalling $48.2 million. The largest deal is 12 Smith Street, Richmond at $2.4 million, cooling off today.",
-  'briefs': "You have 8 active client briefs. 3 have new matches since yesterday. Priya Anand's brief for Brunswick has 5 new properties.",
+  'briefs': "You have 8 active clients. 3 have new matches since yesterday. Priya Anand has 5 new properties for Brunswick.",
   'clients': "You have 23 active clients. 3 are onboarding this week: David Webb, Priya Anand, and Daniel Cho.",
   'smith street': "12 Smith Street, Richmond is a $2.4 million property. The cooling-off period expires today at 5pm for Sarah and Tom Chen. You should confirm unconditional soon.",
   'cooling off': "The cooling-off for 12 Smith Street expires today at 5pm. It's the Chen's purchase at $2.4 million. I recommend confirming unconditional before end of business.",
   'auction': "14 Park Street goes to auction this Saturday at 11am. Webb is the client, guide is $1.6 million. That's in 3 days.",
   'settlement': "22 Oak Avenue settles on the 31st for Daniel Cho at $1.62 million. PEXA is ready and the pre-settlement inspection is booked for Friday.",
-  'default': "I heard you. I'm a demo voice assistant for PropertyGo. In a full setup, I'd connect to your backend and give real answers about properties, clients, and deals. Try asking about 'properties', 'pipeline', 'briefs', or 'clients' for demo responses.",
+    'default': "I heard you. I'm a demo voice assistant for PropertyGo. In a full setup, I'd connect to your backend and give real answers about properties, clients, and deals. Try asking about 'properties', 'pipeline', 'clients', or 'deals' for demo responses.",
 };
 
 function findResponse(input: string): string {

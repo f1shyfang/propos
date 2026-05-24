@@ -11,7 +11,7 @@ interface SidebarProps {
 
 const items = [
   { id: 'dashboard', icon: 'home' as const, label: 'Today', href: '/dashboard' },
-  { id: 'briefs', icon: 'users' as const, label: 'Briefs', href: '/briefs' },
+  { id: 'briefs', icon: 'users' as const, label: 'Clients', href: '/briefs' },
   { id: 'properties', icon: 'building' as const, label: 'Properties', href: '/properties' },
   { id: 'pipeline', icon: 'pipeline' as const, label: 'Pipeline', href: '/pipeline' },
   { id: 'off-market', icon: 'shield' as const, label: 'Off-Market', href: '/off-market' },

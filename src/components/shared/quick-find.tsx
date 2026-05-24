@@ -12,7 +12,7 @@ const TYPE_ICONS: Record<string, 'building' | 'users' | 'briefcase'> = {
 
 const TYPE_LABELS: Record<string, string> = {
   property: 'Property',
-  brief: 'Brief',
+  brief: 'Client',
   deal: 'Deal',
 };
 
@@ -122,7 +122,7 @@ export function QuickFind() {
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search properties, briefs, deals…"
+            placeholder="Search properties, clients, deals…"
             style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--pg-text)', fontFamily: 'var(--pg-font-body)' }}
           />
           {query && (

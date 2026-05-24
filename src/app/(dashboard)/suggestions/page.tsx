@@ -55,7 +55,7 @@ export default function MatchFeedPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <TopBar
-        eyebrow={loading ? 'Loading…' : `${items.length} matches across ${selectedBriefId ? '1 brief' : `${briefs.length} briefs`}`}
+      eyebrow={loading ? 'Loading…' : `${items.length} matches across ${selectedBriefId ? '1 client' : `${briefs.length} clients`}`}
         title="Match Feed"
         actions={
           <>
@@ -64,7 +64,7 @@ export default function MatchFeedPage() {
               onChange={e => handleBriefChange(e.target.value ? Number(e.target.value) : null)}
               style={{ padding: '6px 10px', border: '1px solid var(--pg-border)', borderRadius: 6, background: 'var(--pg-bg)', color: 'var(--pg-text)', fontSize: 12 }}
             >
-              <option value="">All briefs</option>
+              <option value="">All clients</option>
               {briefs.map(b => (
                 <option key={b.id} value={b.id}>{b.clientName}</option>
               ))}
@@ -86,8 +86,8 @@ export default function MatchFeedPage() {
         {!loading && items.length === 0 && (
           <div style={{ padding: '60px 0', textAlign: 'center' }}>
             <div style={{ fontSize: 14, color: 'var(--pg-text-dim)', marginBottom: 6 }}>No matches found</div>
-            <div style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>
-              Add buyer briefs with suburbs and property types to see matches here.
+              <div style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>
+              Add clients with suburbs and property types to see matches here.
             </div>
           </div>
         )}
