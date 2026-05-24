@@ -15,6 +15,8 @@ export interface MatchFeedBrief {
   mustHaves: string[];
   dealBreakers: string[];
   status: string | null;
+  buyerType?: string | null;
+  purchasePurpose?: string | null;
 }
 
 export interface MatchFeedProperty {
@@ -26,6 +28,7 @@ export interface MatchFeedProperty {
   bedrooms: number | null;
   bathrooms: number | null;
   parkingSpaces: number | null;
+  landSize?: number | null;
   price: number | null;
   priceDisplay: string | null;
   days: number | null;

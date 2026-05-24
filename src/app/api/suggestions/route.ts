@@ -49,6 +49,8 @@ export async function GET(req: NextRequest) {
     mustHaves: (b.mustHaves as string[]) ?? [],
     dealBreakers: (b.dealBreakers as string[]) ?? [],
     status: b.status,
+    buyerType: b.buyerType,
+    purchasePurpose: b.purchasePurpose,
   }));
 
   const items = buildMatchFeedItems(feedBriefs, properties);

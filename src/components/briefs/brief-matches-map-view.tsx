@@ -98,6 +98,7 @@ export function BriefMatchesMapView({
               key={m.id}
               style={{
                 display: 'flex',
+                alignItems: 'center',
                 gap: 10,
                 padding: '14px 16px',
                 borderBottom: '1px solid var(--pg-border)',
@@ -115,27 +116,22 @@ export function BriefMatchesMapView({
                 onChange={() => onToggleCompare(m.id)}
                 disabled={!inCompare && compareIds.length >= 3}
                 title={!inCompare && compareIds.length >= 3 ? 'Max 3 for comparison' : 'Compare'}
-                style={{ accentColor: 'var(--pg-accent)', cursor: 'pointer', marginTop: 12, flexShrink: 0 }}
+                style={{ accentColor: 'var(--pg-accent)', cursor: 'pointer', flexShrink: 0 }}
               />
               <a href={m.href} style={{ display: 'flex', gap: 11, flex: 1, minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
                 <PropertyThumb seed={i % 6} height={72} imageUrl={m.imageUrl} style={{ width: 100, flexShrink: 0, borderRadius: 6 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.address}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>{m.suburb}, {m.state}</div>
-                    </div>
-                    <MatchScore score={m.score} size={28} stroke={2.5} />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                    <span style={{ fontFamily: 'var(--pg-font-mono)', fontSize: 13, fontWeight: 500 }}>{m.price}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--pg-text-dim)' }}>
-                      {m.bedrooms != null && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Icon name="bed" size={11} />{m.bedrooms}</span>}
-                      {m.bathrooms != null && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Icon name="bath" size={11} />{m.bathrooms}</span>}
-                      {m.parkingSpaces != null && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Icon name="car" size={11} />{m.parkingSpaces}</span>}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.address}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>{m.suburb}, {m.state}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: 'var(--pg-font-mono)', fontSize: 12.5, fontWeight: 500 }}>{m.price}</span>
+                    {(m.bedrooms != null || m.bathrooms != null || m.parkingSpaces != null) && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--pg-text-dim)' }}>
+                        {m.bedrooms != null && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Icon name="bed" size={11} />{m.bedrooms}</span>}
+                        {m.bathrooms != null && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Icon name="bath" size={11} />{m.bathrooms}</span>}
+                        {m.parkingSpaces != null && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Icon name="car" size={11} />{m.parkingSpaces}</span>}
+                      </span>
+                    )}
                     <span style={{
                       fontSize: 10.5, padding: '1px 6px', borderRadius: 4,
                       background: m.underOffer ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.1)',
@@ -147,15 +143,18 @@ export function BriefMatchesMapView({
                   </div>
                 </div>
               </a>
-              <button
-                type="button"
-                onClick={() => onToggleShortlist(m.id)}
-                disabled={shortlisting === m.id}
-                className={`pg-btn pg-btn-sm ${inShortlist ? 'pg-btn-accent' : ''}`}
-                style={{ alignSelf: 'center', flexShrink: 0 }}
-              >
-                <Icon name="bookmark" size={11} />
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0, alignSelf: 'center' }}>
+                <MatchScore score={m.score} size={28} stroke={2.5} />
+                <button
+                  type="button"
+                  onClick={() => onToggleShortlist(m.id)}
+                  disabled={shortlisting === m.id}
+                  className={`pg-btn pg-btn-sm ${inShortlist ? 'pg-btn-accent' : ''}`}
+                  style={{ padding: '4px 6px' }}
+                >
+                  <Icon name="bookmark" size={11} />
+                </button>
+              </div>
             </div>
           );
         })}

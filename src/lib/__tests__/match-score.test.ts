@@ -90,3 +90,50 @@ describe('computeMatchScore — soft scoring', () => {
     expect(computeMatchScore(fresh, baseBrief)).toBeGreaterThan(computeMatchScore(stale, baseBrief));
   });
 });
+
+describe('computeMatchScore — CMA quality bonus', () => {
+  it('gives higher score to high-CMA-quality properties', () => {
+    const lowQuality: PropertyForMatch = { ...goodProperty, overallScore: 2000 };
+    const highQuality: PropertyForMatch = { ...goodProperty, overallScore: 9000 };
+    expect(computeMatchScore(highQuality, baseBrief)).toBeGreaterThan(computeMatchScore(lowQuality, baseBrief));
+  });
+});
+
+describe('computeMatchScore — buyer-type fit', () => {
+  it('rewards investors with high-yield properties', () => {
+    const investorBrief: BuyerBrief = { ...baseBrief, buyerType: 'investor' };
+    const lowYield: PropertyForMatch = { ...goodProperty, grossYield: 1.5 };
+    const highYield: PropertyForMatch = { ...goodProperty, grossYield: 5.0 };
+    expect(computeMatchScore(highYield, investorBrief)).toBeGreaterThan(computeMatchScore(lowYield, investorBrief));
+  });
+
+  it('rewards downsizers with apartments/units', () => {
+    const downsizerBrief: BuyerBrief = { ...baseBrief, buyerType: 'downsizer' };
+    const house: PropertyForMatch = { ...goodProperty, propertyType: 'house', landSize: 600 };
+    const apartment: PropertyForMatch = { ...goodProperty, propertyType: 'apartment' };
+    expect(computeMatchScore(apartment, downsizerBrief)).toBeGreaterThan(computeMatchScore(house, downsizerBrief));
+  });
+
+  it('penalises owner-occupiers for under-offer properties', () => {
+    const ownerBrief: BuyerBrief = { ...baseBrief, buyerType: 'owner-occupier' };
+    const available: PropertyForMatch = { ...goodProperty, underOffer: false };
+    const underOffer: PropertyForMatch = { ...goodProperty, underOffer: true };
+    expect(computeMatchScore(available, ownerBrief)).toBeGreaterThan(computeMatchScore(underOffer, ownerBrief));
+  });
+});
+
+describe('computeMatchScore — value gap', () => {
+  it('rewards bargains where listed price is below appraised value', () => {
+    const bargain: PropertyForMatch = { ...goodProperty, price: 850000, appraisedValue: 1000000 };
+    const overpriced: PropertyForMatch = { ...goodProperty, price: 1050000, appraisedValue: 1000000 };
+    expect(computeMatchScore(bargain, baseBrief)).toBeGreaterThan(computeMatchScore(overpriced, baseBrief));
+  });
+});
+
+describe('computeMatchScore — under offer penalty', () => {
+  it('reduces score for under-offer properties', () => {
+    const available: PropertyForMatch = { ...goodProperty, underOffer: false };
+    const underOffer: PropertyForMatch = { ...goodProperty, underOffer: true };
+    expect(computeMatchScore(underOffer, baseBrief)).toBeLessThan(computeMatchScore(available, baseBrief));
+  });
+});

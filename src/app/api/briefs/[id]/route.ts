@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (isNaN(briefId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
 
   const body = await req.json();
-  const allowed = ['suburbs', 'propertyTypes', 'budgetMin', 'budgetMax', 'minBeds', 'minBaths', 'parking', 'mustHaves', 'dealBreakers', 'status', 'clientName', 'email'];
+  const allowed = ['suburbs', 'propertyTypes', 'budgetMin', 'budgetMax', 'minBeds', 'minBaths', 'parking', 'mustHaves', 'dealBreakers', 'status', 'clientName', 'email', 'phone', 'contactMethod', 'engagementType', 'preApprovalStatus', 'buyerType', 'urgency', 'purchasePurpose', 'auctionWillingness', 'roadmap'];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) update[key] = body[key];

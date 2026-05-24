@@ -6,6 +6,12 @@ import { Icon } from '@/components/shared/icon';
 
 export const dynamic = 'force-dynamic';
 
+function cleanSuburb(s: string): string {
+  // Strip state prefix like "NSW - " from "NSW - Camperdown"
+  const idx = s.indexOf(' - ');
+  return idx >= 0 ? s.slice(idx + 3).trim() : s.trim();
+}
+
 function formatBudget(min: number | null, max: number | null): string {
   const fmt = (n: number) => n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${(n / 1000).toFixed(0)}K`;
   if (min && max) return `${fmt(min)} – ${fmt(max)}`;
@@ -74,7 +80,7 @@ export default async function BriefsPage() {
                     </div>
                     <div className="pg-mono" style={{ fontSize: 12 }}>{formatBudget(b.budgetMin, b.budgetMax)}</div>
                     <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>
-                      {suburbs.slice(0, 2).join(', ')}{suburbs.length > 2 ? ` +${suburbs.length - 2}` : ''}
+                      {suburbs.slice(0, 3).map(cleanSuburb).join(', ')}{suburbs.length > 3 ? ` +${suburbs.length - 3}` : ''}
                     </div>
                     <div>
                       <span className={`pg-badge ${b.status === 'searching' ? 'pg-badge-green pg-badge-dot' : ''}`} style={{ fontSize: 11 }}>

@@ -118,7 +118,7 @@ export default function BriefDetailPage() {
   const [filter, setFilter] = useState<FilterState | null>(null);
   const [filterDraft, setFilterDraft] = useState<FilterState | null>(null);
   const [savingFilter, setSavingFilter] = useState(false);
-  const [applyingFilter, setApplyingFilter] = useState(false);
+
   const [copied, setCopied] = useState(false);
   const [suburbSuggestions, setSuburbSuggestions] = useState<string[]>([]);
   const matchesOffsetRef = useRef(0);
@@ -134,6 +134,20 @@ export default function BriefDetailPage() {
       setFilter(f);
       setFilterDraft(f);
       filterRef.current = f;
+      // Parse roadmap dates from ISO strings
+      const rm = data.brief?.roadmap;
+      if (Array.isArray(rm) && rm.length > 0) {
+        setRoadmap(rm.map((m: { id: string; label: string; startDate: string; endDate: string; durationDays: number; notes: string }) => ({
+          id: m.id,
+          label: m.label,
+          startDate: new Date(m.startDate),
+          endDate: new Date(m.endDate),
+          durationDays: m.durationDays,
+          notes: m.notes,
+        })));
+      } else {
+        setRoadmap(null);
+      }
     }
     setLoading(false);
   }, [id]);
@@ -178,15 +192,21 @@ export default function BriefDetailPage() {
     }
   }
 
-  async function applyFilter() {
-    if (!filterDraft) return;
-    setApplyingFilter(true);
-    filterRef.current = filterDraft;
-    setFilter(filterDraft);
-    setMatches([]);
-    setMatchTotal(null);
-    await loadMatches(0, true, filterDraft, view === 'split');
-    setApplyingFilter(false);
+  async function saveRoadmap(ms: RoadmapMilestone[]) {
+    await fetch(`/api/briefs/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roadmap: ms.map(m => ({
+          id: m.id,
+          label: m.label,
+          startDate: m.startDate.toISOString(),
+          endDate: m.endDate.toISOString(),
+          durationDays: m.durationDays,
+          notes: m.notes,
+        })),
+      }),
+    });
   }
 
   async function saveFilterToBrief() {
@@ -409,11 +429,11 @@ export default function BriefDetailPage() {
             )}
 
             {matchesLoading && matches.length === 0 ? (
-              <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--pg-text-faint)', fontSize: 13 }}>
+              <div style={{ width: '100%', padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--pg-text-faint)', fontSize: 13 }}>
                 Finding matches…
               </div>
             ) : matches.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--pg-text-dim)' }}>
+              <div style={{ width: '100%', padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--pg-text-dim)' }}>
                 <Icon name="building" size={36} color="var(--pg-text-very-faint)" />
                 <div style={{ fontSize: 15, marginTop: 14, fontWeight: 500 }}>No matches yet</div>
                 <div style={{ fontSize: 13, marginTop: 6 }}>Adjust the client profile or add suburbs to find matching properties.</div>
@@ -548,7 +568,7 @@ export default function BriefDetailPage() {
               </button>
             </div>
             {shortlist.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--pg-text-dim)' }}>
+              <div style={{ width: '100%', padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--pg-text-dim)' }}>
                 <Icon name="bookmark" size={36} color="var(--pg-text-very-faint)" />
                 <div style={{ fontSize: 15, marginTop: 14, fontWeight: 500 }}>No shortlisted properties</div>
                 <div style={{ fontSize: 13, marginTop: 6 }}>Save properties from the Matches tab to build the shortlist.</div>
@@ -739,29 +759,31 @@ export default function BriefDetailPage() {
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <button
                 className="pg-btn pg-btn-accent"
-                disabled={applyingFilter || savingFilter}
-                onClick={() => applyFilter().then(() => setTab('matches'))}
-              >
-                {applyingFilter
-                  ? <><Spinner />Applying…</>
-                  : 'Apply preview'}
-              </button>
-              <button
-                className="pg-btn"
-                disabled={savingFilter || applyingFilter}
+                disabled={savingFilter}
                 onClick={() => saveFilterToBrief().then(() => setTab('matches'))}
               >
                 {savingFilter
                   ? <><Spinner />Saving…</>
-                  : 'Save to profile'}
+                  : 'Save and apply'}
               </button>
-              <button className="pg-btn pg-btn-ghost" disabled={savingFilter || applyingFilter} onClick={() => { setFilterDraft(filter); setTab('matches'); }}>Cancel</button>
+              <button className="pg-btn pg-btn-ghost" disabled={savingFilter} onClick={() => { setFilterDraft(filter); setTab('matches'); }}>Cancel</button>
             </div>
           </div>
         )}
 
         {tab === 'roadmap' && (
-          <RoadmapTab roadmap={roadmap} onInit={() => setRoadmap(generateDefaultRoadmap(new Date()))} onChange={setRoadmap} />
+          <RoadmapTab
+            roadmap={roadmap}
+            onInit={() => {
+              const ms = generateDefaultRoadmap(new Date());
+              setRoadmap(ms);
+              saveRoadmap(ms);
+            }}
+            onChange={ms => {
+              setRoadmap(ms);
+              saveRoadmap(ms);
+            }}
+          />
         )}
       </div>
     </div>
@@ -927,7 +949,7 @@ function RoadmapTab({ roadmap, onInit, onChange }: {
 }) {
   if (!roadmap) {
     return (
-      <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--pg-text-dim)' }}>
+      <div style={{ width: '100%', padding: '40px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--pg-text-dim)' }}>
         <Icon name="calendar" size={36} color="var(--pg-text-very-faint)" />
         <div style={{ fontSize: 15, marginTop: 14, fontWeight: 500 }}>No strategy roadmap yet</div>
         <div style={{ fontSize: 13, marginTop: 6 }}>Generate a default timeline to share the purchase journey with your client.</div>

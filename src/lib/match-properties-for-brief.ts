@@ -18,6 +18,8 @@ export type BriefLike = {
   parking?: string | null;
   mustHaves?: string[] | null;
   dealBreakers?: string[] | null;
+  buyerType?: string | null;
+  purchasePurpose?: string | null;
 };
 
 export function briefLikeToCriteria(brief: BriefLike): BuyerBrief {
@@ -31,6 +33,8 @@ export function briefLikeToCriteria(brief: BriefLike): BuyerBrief {
     parking: (brief.parking as BuyerBrief['parking']) ?? 'nice_to_have',
     mustHaves: (brief.mustHaves as string[]) ?? [],
     dealBreakers: brief.dealBreakers ?? [],
+    buyerType: brief.buyerType,
+    purchasePurpose: brief.purchasePurpose,
   };
 }
 
@@ -45,11 +49,16 @@ export function briefRowToCriteria(brief: BriefRow): BuyerBrief {
     parking: brief.parking,
     mustHaves: brief.mustHaves as string[] | undefined,
     dealBreakers: brief.dealBreakers as string[] | undefined,
+    buyerType: brief.buyerType,
+    purchasePurpose: brief.purchasePurpose,
   });
 }
 
+type PropertyMatchBase = Pick<PropertyRow, 'price' | 'suburb' | 'propertyType' | 'bedrooms' | 'bathrooms' | 'parkingSpaces' | 'days'> & Partial<Pick<PropertyRow, 'landSize'>>;
+type PropertyMatchExtras = Partial<Pick<PropertyRow, 'overallScore' | 'appraisedValue' | 'grossYield' | 'underOffer'>>;
+
 export function propertyRowToMatchInput(
-  row: Pick<PropertyRow, 'price' | 'suburb' | 'propertyType' | 'bedrooms' | 'bathrooms' | 'parkingSpaces' | 'days'>,
+  row: PropertyMatchBase & PropertyMatchExtras,
 ): PropertyForMatch {
   return {
     price: row.price ?? 0,
@@ -60,6 +69,11 @@ export function propertyRowToMatchInput(
     parkingSpaces: row.parkingSpaces,
     features: [],
     daysOnMarket: row.days,
+    landSize: row.landSize ?? undefined,
+    overallScore: row.overallScore,
+    appraisedValue: row.appraisedValue,
+    grossYield: row.grossYield ?? undefined,
+    underOffer: !!row.underOffer,
   };
 }
 

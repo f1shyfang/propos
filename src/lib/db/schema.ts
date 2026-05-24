@@ -228,6 +228,7 @@ export const buyerBriefsTable = pgTable("buyer_briefs", {
   purchasePurpose: text("purchase_purpose").default("PPOR"),
   auctionWillingness: boolean("auction_willingness").default(true),
   status: text("status").default("searching"),
+  roadmap: jsonb("roadmap").$type<Array<{ id: string; label: string; startDate: string; endDate: string; durationDays: number; notes: string }>>().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
