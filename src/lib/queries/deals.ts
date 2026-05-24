@@ -1,5 +1,13 @@
 import { fetchJson } from '@/lib/api/fetch-json';
 
+export type OfferEventSummary = {
+  id: number;
+  eventType: string;
+  previousValue: string | null;
+  newValue: string | null;
+  createdAt: string;
+};
+
 export type PipelineDeal = {
   id: number;
   status: string;
@@ -18,6 +26,7 @@ export type PipelineDeal = {
   priceDisplay: string | null;
   overallScore: number | null;
   createdAt: string;
+  recentOfferEvents?: OfferEventSummary[];
 };
 
 export function fetchDeals() {

@@ -27,6 +27,7 @@ import {
   patchDealStatus,
   type PipelineDeal,
 } from '@/lib/queries/deals';
+import { OfferHistoryInline } from '@/components/deals/offer-history-timeline';
 
 type ViewMode = 'board' | 'list';
 
@@ -431,6 +432,9 @@ function DealCardContent({
           <div style={{ marginTop: 7 }}>
             <span className="pg-badge" style={{ fontSize: 10 }}>{deal.offerSubState.replace(/_/g, ' ')}</span>
           </div>
+        )}
+        {deal.status === 'offer_made' && (deal.recentOfferEvents?.length ?? 0) > 0 && (
+          <OfferHistoryInline events={deal.recentOfferEvents!} />
         )}
         {daysToSettlement !== null && (
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--pg-border)', fontSize: 10.5, color: daysToSettlement < 7 ? 'var(--pg-red)' : 'var(--pg-text-faint)' }}>

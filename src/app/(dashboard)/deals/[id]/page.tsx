@@ -268,6 +268,26 @@ export default function DealDetailPage() {
                   <div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(calcStampDuty(deal.price, deal.state, deal.purchasePurpose === 'investment'))}</div>
                 </div>
               )}
+              {(deal.offerSubState || deal.offerAmount) && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--pg-border)' }}>
+                  {deal.offerAmount != null && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', marginBottom: 2 }}>Current offer</div>
+                      <div style={{ fontSize: 15, fontWeight: 600 }}>{fmt(deal.offerAmount)}</div>
+                      {deal.offerSubState && (
+                        <span className="pg-badge" style={{ fontSize: 10, marginTop: 6, display: 'inline-block' }}>
+                          {getOfferSubStateLabel(deal.offerSubState)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <OfferHistoryTimeline
+                    dealId={id}
+                    refreshKey={`${deal.offerSubState}-${deal.offerAmount}`}
+                    compact
+                  />
+                </div>
+              )}
             </div>
             {deal.strategyNotes && (
               <div className="pg-card" style={{ padding: '20px 22px', gridColumn: '1 / -1' }}>
@@ -504,6 +524,12 @@ function OfferTab({ deal, dealId, documents, onSave, onRefresh, saving }: {
           {saving ? 'Saving…' : 'Save offer details'}
         </button>
       </div>
+      <div className="pg-card" style={{ padding: '20px 22px', marginTop: 20 }}>
+        <OfferHistoryTimeline
+          dealId={dealId}
+          refreshKey={`${deal.offerSubState}-${deal.offerAmount}`}
+        />
+      </div>
       <DealDocumentPanel
         dealId={dealId}
         documents={documents}
@@ -513,7 +539,6 @@ function OfferTab({ deal, dealId, documents, onSave, onRefresh, saving }: {
         tagFilter={['Offer Letter', 'Contract of Sale', 'Correspondence', 'Other']}
         allowGenerate="offer"
       />
-      <OfferHistoryTimeline dealId={dealId} key={`${dealId}-${deal.offerSubState}-${deal.offerAmount}`} />
     </div>
   );
 }

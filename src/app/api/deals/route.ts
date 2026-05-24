@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dealsTable, buyerBriefsTable, propertiesTable } from '@/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { dealsTable, buyerBriefsTable, propertiesTable, dealOfferEventsTable } from '@/lib/db/schema';
+import { eq, desc, inArray } from 'drizzle-orm';
+import { groupRecentOfferEventsByDeal } from '@/lib/offer-history';
 import {
   createDeal,
   findDealByBriefAndProperty,
@@ -56,7 +57,27 @@ export async function GET(req: NextRequest) {
     .leftJoin(propertiesTable, eq(dealsTable.propertyId, propertiesTable.id))
     .orderBy(desc(dealsTable.createdAt));
 
-  return NextResponse.json({ deals });
+  const dealIds = deals.map((d) => d.id);
+  const offerEventRows =
+    dealIds.length > 0
+      ? await db
+          .select()
+          .from(dealOfferEventsTable)
+          .where(inArray(dealOfferEventsTable.dealId, dealIds))
+          .orderBy(desc(dealOfferEventsTable.createdAt))
+      : [];
+
+  const recentByDeal = groupRecentOfferEventsByDeal(offerEventRows);
+
+  const dealsWithHistory = deals.map((deal) => ({
+    ...deal,
+    recentOfferEvents: (recentByDeal[deal.id] ?? []).map((ev) => ({
+      ...ev,
+      createdAt: ev.createdAt?.toISOString() ?? new Date().toISOString(),
+    })),
+  }));
+
+  return NextResponse.json({ deals: dealsWithHistory });
 }
 
 export async function POST(req: NextRequest) {

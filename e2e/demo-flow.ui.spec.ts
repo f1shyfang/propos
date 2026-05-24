@@ -44,5 +44,6 @@ test.describe('Buyer agent demo UI smoke', () => {
     await page.getByRole('button', { name: 'Offer' }).click();
     await expect(page.getByText(/offer amount/i)).toBeVisible();
     await expect(page.getByText(/generate offer pdf/i)).toBeVisible();
+    await expect(page.getByText(/offer history/i).first()).toBeVisible();
   });
 });

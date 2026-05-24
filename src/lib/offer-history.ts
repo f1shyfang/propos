@@ -52,6 +52,14 @@ function labelSubState(value: string | null): string {
   return SUB_STATE_LABELS[value] ?? value.replace(/_/g, ' ');
 }
 
+function formatAmountShort(value: string | null): string {
+  if (!value) return '—';
+  const n = Number(value);
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1000)}K`;
+  return `$${n.toLocaleString('en-AU')}`;
+}
+
 export function formatOfferEventLabel(entry: OfferHistoryEntryInput): string {
   if (entry.eventType === 'sub_state') {
     return `Offer status: ${labelSubState(entry.previousValue)} → ${labelSubState(entry.newValue)}`;
@@ -63,4 +71,38 @@ export function formatOfferEventLabel(entry: OfferHistoryEntryInput): string {
     ? `$${Number(entry.newValue).toLocaleString('en-AU')}`
     : '—';
   return `Offer amount: ${prev} → ${next}`;
+}
+
+/** Short label for pipeline cards and compact overview. */
+export function formatOfferEventShort(entry: OfferHistoryEntryInput): string {
+  if (entry.eventType === 'sub_state') {
+    return `${labelSubState(entry.previousValue)} → ${labelSubState(entry.newValue)}`;
+  }
+  return `${formatAmountShort(entry.previousValue)} → ${formatAmountShort(entry.newValue)}`;
+}
+
+const MAX_RECENT_OFFER_EVENTS_PER_DEAL = 3;
+
+export type OfferEventRecord = {
+  id: number;
+  dealId: number;
+  eventType: string;
+  previousValue: string | null;
+  newValue: string | null;
+  createdAt: Date;
+};
+
+export function groupRecentOfferEventsByDeal(
+  rows: OfferEventRecord[],
+  limitPerDeal = MAX_RECENT_OFFER_EVENTS_PER_DEAL,
+): Record<number, Omit<OfferEventRecord, 'dealId'>[]> {
+  const byDeal: Record<number, Omit<OfferEventRecord, 'dealId'>[]> = {};
+  for (const row of rows) {
+    const list = byDeal[row.dealId] ?? [];
+    if (list.length >= limitPerDeal) continue;
+    const { dealId: _dealId, ...rest } = row;
+    list.push(rest);
+    byDeal[row.dealId] = list;
+  }
+  return byDeal;
 }
