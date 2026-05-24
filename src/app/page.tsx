@@ -93,7 +93,7 @@ export default function LandingPage() {
             One calm workspace for <span className="pg-chalk-underline">every property deal</span>
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-relaxed text-[var(--pg-text-dim)] sm:text-lg">
-            Propos unifies briefs, matching, shortlists, and client feedback — so Australian
+            PropOS unifies briefs, matching, shortlists, and client feedback — so Australian
             buyer&apos;s agents spend less time portal-hopping and more time closing for clients.
           </p>
           <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -258,7 +258,7 @@ export default function LandingPage() {
 
       <footer className="border-t border-[var(--pg-border)] py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 text-sm text-[var(--pg-text-faint)] sm:flex-row sm:px-8">
-          <p>© {new Date().getFullYear()} Propos</p>
+          <p>© {new Date().getFullYear()} PropOS</p>
           <div className="flex gap-6">
             <a href="#beta" className="hover:text-[var(--pg-text-dim)]">
               Beta

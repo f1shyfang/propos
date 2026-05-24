@@ -28,7 +28,7 @@ export function getProfileFields(user: AuthUser | null): ProfileFields {
 
 export function getUserDisplay(user: AuthUser | null): UserDisplay {
   if (!user) {
-    return { name: "Guest", email: "", org: "Propos", initials: "G" };
+    return { name: "Guest", email: "", org: "PropOS", initials: "G" };
   }
 
   const email = user.email ?? "";
