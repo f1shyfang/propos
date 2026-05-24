@@ -11,6 +11,7 @@ import {
   SYDNEY_SUBURBS,
   type BriefFormPayload,
 } from '@/lib/brief-field-options';
+import { buildBriefMatchesHref } from '@/lib/core-flow-utils';
 
 type BriefForm = BriefFormPayload & { suburbInput: string };
 
@@ -118,7 +119,7 @@ export default function NewBriefPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? 'Save failed'); return; }
-      router.push(`/briefs/${data.brief.id}`);
+      router.push(buildBriefMatchesHref(data.brief.id));
     } finally {
       setSaving(false);
     }

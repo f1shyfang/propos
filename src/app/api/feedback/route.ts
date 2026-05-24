@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { shortlistsTable } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { validateClientFeedbackStatus } from '@/lib/feedback-utils';
+import { buildClientFeedbackUpdate } from '@/lib/core-flow-utils';
 
 export async function POST(req: NextRequest) {
   const { shortlistId, feedbackStatus, feedbackText, feedbackReason } = await req.json();
@@ -11,9 +12,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid feedbackStatus' }, { status: 400 });
   }
 
+  const update = buildClientFeedbackUpdate({ feedbackStatus, feedbackText, feedbackReason });
+
   const [updated] = await db
     .update(shortlistsTable)
-    .set({ feedbackStatus, feedbackText: feedbackText ?? null, feedbackReason: feedbackReason ?? null, feedbackAt: new Date() })
+    .set({ ...update, feedbackAt: new Date() })
     .where(eq(shortlistsTable.id, Number(shortlistId)))
     .returning();
 

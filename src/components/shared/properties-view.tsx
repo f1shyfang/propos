@@ -132,7 +132,6 @@ export function PropertiesView({ initialPins, defaultCenter }: {
           )}
         </form>
         <div style={{ flex: 1 }} />
-        <button className="pg-btn"><Icon name="bookmark" size={13} />Save search</button>
       </div>
 
       {/* Filter chips */}

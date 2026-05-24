@@ -65,8 +65,16 @@ export function DashboardFeedback() {
       map.set(item.shortlistId, item);
     }
     return Array.from(map.values()).sort((a, b) => {
-      const ta = a.feedbackAt ? new Date(a.feedbackAt).getTime() : 0;
-      const tb = b.feedbackAt ? new Date(b.feedbackAt).getTime() : 0;
+      const ta = a.feedbackAt
+        ? new Date(a.feedbackAt).getTime()
+        : a.sharedAt
+          ? new Date(a.sharedAt).getTime()
+          : 0;
+      const tb = b.feedbackAt
+        ? new Date(b.feedbackAt).getTime()
+        : b.sharedAt
+          ? new Date(b.sharedAt).getTime()
+          : 0;
       return tb - ta;
     });
   }
@@ -135,7 +143,7 @@ export function DashboardFeedback() {
 
       {rows.length === 0 && !loading ? (
         <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--pg-text-faint)', fontSize: 13 }}>
-          No shared properties with feedback yet. Share a shortlist with a client to see their responses here.
+          No shared shortlists yet. Share properties from a brief to track client views and feedback here.
         </div>
       ) : (
         <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
@@ -205,7 +213,9 @@ export function DashboardFeedback() {
                   </span>
                 </div>
                 <div style={{ textAlign: 'right', color: 'var(--pg-text-faint)', fontSize: 12, minWidth: 0, overflow: 'hidden' }}>
-                  {timeAgo(r.feedbackAt)}
+                  {r.feedbackStatus === 'new' || r.feedbackStatus === 'viewed'
+                    ? timeAgo(r.sharedAt)
+                    : timeAgo(r.feedbackAt)}
                 </div>
                 <div style={{ minWidth: 0, overflow: 'hidden' }}>
                   {r.briefId && r.feedbackStatus === 'interested' && (

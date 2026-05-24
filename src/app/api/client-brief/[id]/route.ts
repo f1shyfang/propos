@@ -27,6 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     agentNote: row.s.agentNote,
     feedbackStatus: row.s.feedbackStatus ?? 'new',
     feedbackText: row.s.feedbackText,
+    feedbackReason: row.s.feedbackReason,
     sharedAt: row.s.sharedAt,
     property: row.p
       ? {

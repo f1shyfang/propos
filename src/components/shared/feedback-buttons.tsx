@@ -7,6 +7,7 @@ interface FeedbackButtonsProps {
   shortlistId: number;
   initialStatus?: string;
   initialText?: string;
+  initialReason?: string;
   onSaved?: () => void;
 }
 
@@ -21,10 +22,10 @@ const NOT_FOR_ME_REASONS = [
   'Too small', 'Too large', 'Wrong property type',
 ];
 
-export function FeedbackButtons({ shortlistId, initialStatus = 'new', initialText = '', onSaved }: FeedbackButtonsProps) {
+export function FeedbackButtons({ shortlistId, initialStatus = 'new', initialText = '', initialReason = '', onSaved }: FeedbackButtonsProps) {
   const [status, setStatus] = useState(initialStatus);
   const [text, setText] = useState(initialText);
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState(initialReason);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const commentRef = useRef<HTMLTextAreaElement>(null);
@@ -43,7 +44,9 @@ export function FeedbackButtons({ shortlistId, initialStatus = 'new', initialTex
       }),
     });
     if (res.ok) {
+      const data = await res.json();
       setStatus(newStatus);
+      if (data.shortlist?.feedbackReason) setReason(data.shortlist.feedbackReason);
       setSaved(true);
       onSaved?.();
       setTimeout(() => setSaved(false), 2000);

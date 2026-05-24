@@ -16,6 +16,7 @@ import {
 import { GanttRoadmap } from "@/components/shared/gantt-roadmap";
 import Link from "next/link";
 import { ShortlistDealButton } from "@/components/deals/shortlist-deal-button";
+import { buildClientBriefHref, buildClientBriefUrl } from "@/lib/core-flow-utils";
 
 interface BriefMatch {
   id: string;
@@ -180,6 +181,8 @@ export default function BriefDetailPage() {
   const [linkEmail, setLinkEmail] = useState("");
   const [linking, setLinking] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [shareHandoffUrl, setShareHandoffUrl] = useState<string | null>(null);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [roadmap, setRoadmap] = useState<RoadmapMilestone[] | null>(null);
   const [filter, setFilter] = useState<FilterState | null>(null);
@@ -378,6 +381,7 @@ export default function BriefDetailPage() {
   async function shareWithClient(shortlistIds?: number[]) {
     setSharing(true);
     setShareMessage(null);
+    setShareHandoffUrl(null);
     const res = await fetch("/api/shortlists/share", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -385,14 +389,24 @@ export default function BriefDetailPage() {
     });
     const body = await res.json().catch(() => ({}));
     if (res.ok) {
+      const clientUrl = buildClientBriefUrl(Number(id), window.location.origin);
+      setShareHandoffUrl(clientUrl);
       setShareMessage(
-        `Shared ${body.sharedCount} propert${body.sharedCount === 1 ? "y" : "ies"} with client`,
+        `Marked ${body.sharedCount} propert${body.sharedCount === 1 ? "y" : "ies"} as shared. Send the client review link below — no email was sent.`,
       );
       await reloadBrief();
     } else {
       setShareMessage(body.error ?? "Could not share");
     }
     setSharing(false);
+  }
+
+  function copyShareHandoffLink() {
+    if (!shareHandoffUrl) return;
+    navigator.clipboard.writeText(shareHandoffUrl).then(() => {
+      setShareLinkCopied(true);
+      setTimeout(() => setShareLinkCopied(false), 2000);
+    });
   }
 
   async function linkClient() {
@@ -429,7 +443,7 @@ export default function BriefDetailPage() {
   }
 
   function copyClientLink() {
-    const url = `${window.location.origin}/client-brief/${id}`;
+    const url = buildClientBriefUrl(Number(id), window.location.origin);
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -544,6 +558,22 @@ export default function BriefDetailPage() {
       >
         {tab === "matches" && (
           <>
+            <div
+              style={{
+                marginBottom: 16,
+                padding: "12px 16px",
+                background: "var(--pg-accent-soft)",
+                border: "1px solid rgba(229,177,0,0.25)",
+                borderRadius: 8,
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: "var(--pg-text)",
+              }}
+            >
+              <strong style={{ fontWeight: 500 }}>Step 2 — Review matches.</strong>{" "}
+              Ranked properties for this brief. Shortlist the best fits, then share from the Shortlist tab
+              so your client can leave feedback.
+            </div>
             {(filter || matches.length > 0) && (
               <div
                 style={{
@@ -837,10 +867,49 @@ export default function BriefDetailPage() {
                     Sharing…
                   </>
                 ) : (
-                  "Share all with client"
+                  "Mark all shared"
                 )}
               </button>
             </div>
+            {shareHandoffUrl && (
+              <div
+                className="pg-card"
+                style={{
+                  marginBottom: 16,
+                  padding: 16,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Client review link</div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--pg-text-dim)",
+                    fontFamily: "var(--pg-font-mono)",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {shareHandoffUrl}
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" className="pg-btn pg-btn-sm" onClick={copyShareHandoffLink}>
+                    <Icon name="share" size={12} />
+                    {shareLinkCopied ? "Copied!" : "Copy link"}
+                  </button>
+                  <a
+                    href={buildClientBriefHref(Number(id))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pg-btn pg-btn-sm pg-btn-accent"
+                  >
+                    <Icon name="arrow-up-right" size={12} />
+                    Open client view
+                  </a>
+                </div>
+              </div>
+            )}
             {shortlist.length === 0 ? (
               <div
                 style={{

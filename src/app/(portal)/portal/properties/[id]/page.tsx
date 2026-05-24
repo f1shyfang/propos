@@ -8,6 +8,15 @@ import { FeedbackButtons } from '@/components/shared/feedback-buttons';
 import { Icon } from '@/components/shared/icon';
 import { PropertyThumb } from '@/components/shared/property-thumb';
 
+interface ComparableSale {
+  address: string | null;
+  saleDate: string | Date | null;
+  salePrice: string | null;
+  pricePerSqm: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+}
+
 interface PropertyDetail {
   id: string;
   address: string;
@@ -19,6 +28,14 @@ interface PropertyDetail {
   bathrooms: number | null;
   parkingSpaces: number | null;
   description: string | null;
+  appraisedValue: number | null;
+  comparables: ComparableSale[];
+  riskSummary: string[];
+}
+
+function formatSaleDate(date: string | Date | null): string {
+  if (!date) return '—';
+  return new Date(date).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' });
 }
 
 export default function PortalPropertyPage() {
@@ -29,6 +46,7 @@ export default function PortalPropertyPage() {
   const [property, setProperty] = useState<PropertyDetail | null>(null);
   const [feedbackStatus, setFeedbackStatus] = useState('new');
   const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackReason, setFeedbackReason] = useState('');
   const [agentNote, setAgentNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +70,9 @@ export default function PortalPropertyPage() {
         bathrooms: p.bathrooms,
         parkingSpaces: p.parkingSpaces,
         description: p.description ?? null,
+        appraisedValue: p.appraisedValue ?? null,
+        comparables: p.comparables ?? [],
+        riskSummary: p.riskSummary ?? [],
       });
     }
 
@@ -63,6 +84,7 @@ export default function PortalPropertyPage() {
       if (item) {
         setFeedbackStatus(item.feedbackStatus ?? 'new');
         setFeedbackText(item.feedbackText ?? '');
+        setFeedbackReason(item.feedbackReason ?? '');
         setAgentNote(item.agentNote);
         if (item.feedbackStatus === 'new') {
           await fetch('/api/feedback/viewed', {
@@ -121,6 +143,71 @@ export default function PortalPropertyPage() {
         </div>
       )}
 
+      {property.riskSummary.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div className="pg-label" style={{ marginBottom: 10 }}>Risk &amp; area context</div>
+          <div className="pg-card-flat" style={{ padding: 14 }}>
+            {property.riskSummary.map((line) => (
+              <div
+                key={line}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  fontSize: 13,
+                  padding: '6px 0',
+                  borderBottom: '1px solid var(--pg-border)',
+                }}
+              >
+                <Icon name="shield" size={13} color="var(--pg-text-dim)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <span>{line}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {property.comparables.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div className="pg-label" style={{ marginBottom: 10 }}>Recent comparable sales</div>
+          <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
+            {property.comparables.map((c, i) => (
+              <div
+                key={`${c.address}-${i}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: 12,
+                  padding: '11px 16px',
+                  fontSize: 13,
+                  borderBottom: i < property.comparables.length - 1 ? '1px solid var(--pg-border)' : 'none',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 500 }}>{c.address ?? 'Comparable sale'}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--pg-text-faint)', marginTop: 2 }}>
+                    {formatSaleDate(c.saleDate)}
+                    {c.bedrooms != null ? ` · ${c.bedrooms} bed` : ''}
+                    {c.bathrooms != null ? ` · ${c.bathrooms} bath` : ''}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="pg-mono" style={{ fontWeight: 500 }}>{c.salePrice ?? '—'}</div>
+                  {c.pricePerSqm && (
+                    <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', marginTop: 2 }}>{c.pricePerSqm}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          {property.appraisedValue != null && (
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--pg-text-dim)' }}>
+              Agent estimate: ${(property.appraisedValue / 1_000_000).toFixed(2)}M range context
+            </div>
+          )}
+        </div>
+      )}
+
       {property.description && (
         <p style={{ marginTop: 24, fontSize: 14, lineHeight: 1.6, color: 'var(--pg-text-dim)' }}>
           {property.description}
@@ -134,6 +221,7 @@ export default function PortalPropertyPage() {
             shortlistId={Number(shortlistId)}
             initialStatus={feedbackStatus}
             initialText={feedbackText}
+            initialReason={feedbackReason}
             onSaved={load}
           />
         </div>

@@ -50,6 +50,7 @@ const statusLabel: Record<string, string> = {
 
 export default function ClientPortalPage() {
   const [urlInput, setUrlInput] = useState('');
+  const [urlSent, setUrlSent] = useState(false);
 
   const { data: shortlistData, isLoading: shortlistsLoading } = useQuery({
     queryKey: queryKeys.portal.shortlists,
@@ -258,7 +259,17 @@ export default function ClientPortalPage() {
         <div style={{ flex: '0 0 360px', display: 'flex', gap: 6 }}>
           <input className="pg-input" placeholder="https://www.domain.com.au/..." style={{ flex: 1 }}
             value={urlInput} onChange={e => setUrlInput(e.target.value)} />
-          <button className="pg-btn pg-btn-accent" onClick={() => { if (urlInput) { alert('Sent to Jess!'); setUrlInput(''); } }}>Send to Jess</button>
+          <button
+            className="pg-btn pg-btn-accent"
+            onClick={() => {
+              if (!urlInput.trim()) return;
+              setUrlSent(true);
+              setUrlInput('');
+              setTimeout(() => setUrlSent(false), 3000);
+            }}
+          >
+            {urlSent ? 'Saved for review' : 'Save for review'}
+          </button>
         </div>
       </div>
 

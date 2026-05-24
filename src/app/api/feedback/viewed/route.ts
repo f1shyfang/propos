@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
   const [updated] = await db
     .update(shortlistsTable)
-    .set({ feedbackStatus: 'viewed' })
+    .set({ feedbackStatus: 'viewed', feedbackAt: new Date() })
     .where(eq(shortlistsTable.id, Number(shortlistId)))
     .returning();
 

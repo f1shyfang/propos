@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { propertiesTable, suburbsTable, schoolsTable } from '@/lib/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { cmaRecordsTable, propertiesTable, suburbsTable } from '@/lib/db/schema';
+import { desc, eq, sql } from 'drizzle-orm';
+import { calculatePricePerSqm } from '@/lib/cma-utils';
 import { formatPrice } from '@/lib/utils';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -49,6 +50,40 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     }));
   }
 
+  const cmaRows = await db
+    .select()
+    .from(cmaRecordsTable)
+    .where(eq(cmaRecordsTable.propertyId, p.id))
+    .orderBy(desc(cmaRecordsTable.saleDate))
+    .limit(4);
+
+  const comparables = cmaRows.map((c) => ({
+    address: c.comparableAddress,
+    saleDate: c.saleDate,
+    salePrice: c.salePrice != null ? formatPrice(c.salePrice, null) : null,
+    pricePerSqm: (() => {
+      const pps = c.pricePerSqm ?? calculatePricePerSqm(c.salePrice, c.landSizeSqm);
+      return pps != null ? `$${pps.toLocaleString('en-AU')}/m²` : null;
+    })(),
+    bedrooms: c.bedrooms,
+    bathrooms: c.bathrooms,
+  }));
+
+  const riskSummary: string[] = [];
+  if (suburb?.crimeRank != null) {
+    const level = suburb.crimeRank <= 30 ? 'lower' : suburb.crimeRank <= 70 ? 'moderate' : 'higher';
+    riskSummary.push(`Suburb crime rank ${suburb.crimeRank} (${level} relative to NSW)`);
+  }
+  if (p.distressScore != null && p.distressScore > 60) {
+    riskSummary.push('Elevated distress signals on listing data');
+  }
+  if (p.confidenceScore != null && p.confidenceScore < 60) {
+    riskSummary.push('Lower confidence in automated valuation');
+  }
+  if (riskSummary.length === 0 && p.confidenceScore != null) {
+    riskSummary.push(`Valuation confidence ${p.confidenceScore}/100`);
+  }
+
   return NextResponse.json({
     property: {
       id: p.id,
@@ -79,6 +114,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         trendSummary: suburb.crimeTrendSummary,
       } : null,
       nearbySchools,
+      comparables,
+      riskSummary,
     },
   });
 }

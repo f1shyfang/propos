@@ -200,12 +200,6 @@ export default async function PropertyDetailPage({
         <a style={{ color: 'var(--pg-text-faint)', cursor: 'pointer' }}>{p.suburb}, {p.state}</a>
         <Icon name="chevron-right" size={12} color="var(--pg-text-very-faint)" />
         <span style={{ color: 'var(--pg-text)' }}>{p.address}</span>
-        <div style={{ flex: 1 }} />
-        <button className="pg-btn pg-btn-sm pg-btn-ghost" style={{ color: 'var(--pg-text-dim)' }}><Icon name="chevron-left" size={12} />Prev</button>
-        <button className="pg-btn pg-btn-sm pg-btn-ghost" style={{ color: 'var(--pg-text-dim)' }}>Next<Icon name="chevron-right" size={12} /></button>
-        <div className="pg-divider-v" style={{ height: 18, margin: '0 4px' }} />
-        <button className="pg-btn pg-btn-sm pg-btn-ghost" style={{ color: 'var(--pg-text-dim)' }}><Icon name="share" size={12} />Share</button>
-        <button className="pg-btn pg-btn-sm pg-btn-ghost" style={{ color: 'var(--pg-text-dim)' }}><Icon name="bookmark" size={12} />Save</button>
       </div>
 
       <div style={{ padding: '24px 32px 28px', display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 32 }}>
@@ -314,16 +308,13 @@ export default async function PropertyDetailPage({
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 0, marginTop: 24, borderBottom: '1px solid var(--pg-border)' }}>
-            {[['Overview', true], ['Match', false], ['CMA', false], ['Feasibility', false], ['Due diligence', false], ['History', false]].map(([l, active], i) => (
-              <button key={i} style={{
-                background: 'none', border: 'none', padding: '12px 16px 14px',
-                fontSize: 13, fontWeight: active ? 500 : 400,
-                color: active ? 'var(--pg-text)' : 'var(--pg-text-dim)',
-                cursor: 'pointer',
-                borderBottom: active ? '2px solid var(--pg-text)' : '2px solid transparent',
-                marginBottom: -1, fontFamily: 'var(--pg-font-body)',
-              }}>{l as string}</button>
-            ))}
+            <span style={{
+              padding: '12px 16px 14px',
+              fontSize: 13, fontWeight: 500,
+              color: 'var(--pg-text)',
+              borderBottom: '2px solid var(--pg-text)',
+              marginBottom: -1,
+            }}>Overview</span>
           </div>
 
           {/* Overview content */}

@@ -12,6 +12,7 @@ interface ShortlistItem {
   agentNote: string | null;
   feedbackStatus: string;
   feedbackText: string | null;
+  feedbackReason: string | null;
   sharedAt: string | null;
   property: {
     id: string; address: string | null; suburb: string | null; state: string | null;
@@ -56,20 +57,28 @@ function PropertyFeedbackCard({
   const p = item.property;
   const [status, setStatus] = useState(item.feedbackStatus);
   const [text, setText] = useState(item.feedbackText ?? '');
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState(item.feedbackReason ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
   async function submit(newStatus: string, newReason?: string) {
     setSaving(true);
+    const reasonValue = newReason ?? (newStatus === 'not_for_me' ? reason : '');
     const res = await fetch(`/api/client-brief/${briefId}/feedback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shortlistId: item.shortlistId, feedbackStatus: newStatus, feedbackText: text || null }),
+      body: JSON.stringify({
+        shortlistId: item.shortlistId,
+        feedbackStatus: newStatus,
+        feedbackText: text || null,
+        feedbackReason: reasonValue || null,
+      }),
     });
     if (res.ok) {
+      const data = await res.json();
       setStatus(newStatus);
+      if (data.shortlist?.feedbackReason) setReason(data.shortlist.feedbackReason);
       onUpdated(item.shortlistId, newStatus, text);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -149,7 +158,7 @@ function PropertyFeedbackCard({
           {status === 'not_for_me' && (
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 10 }}>
               {NOT_FOR_ME_REASONS.map(r => (
-                <button key={r} onClick={() => { setReason(r); submit('not_for_me'); }}
+                <button key={r} onClick={() => { setReason(r); submit('not_for_me', r); }}
                   style={{
                     padding: '3px 9px', borderRadius: 999, fontSize: 11,
                     border: '1px solid',
