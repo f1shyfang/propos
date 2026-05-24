@@ -45,6 +45,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# remotion promo (video/)
+/video/node_modules/
+/video/out/
+/video/*.mp4
+
 # large data files
 data/properties copy_coords.jsonl
 data/property_images.jsonl

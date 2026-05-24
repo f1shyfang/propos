@@ -1,20 +1,24 @@
 import { test, expect } from '@playwright/test';
-
-/**
- * Optional browser smoke checks for the demo (run after `pnpm test:e2e:install`).
- *
- *   PLAYWRIGHT_UI=1 pnpm test:e2e e2e/demo-flow.ui.spec.ts
- *
- * Requires a prior API run or manual setup: set DEMO_E2E_BRIEF_ID, DEMO_E2E_PROPERTY_ID, DEMO_E2E_DEAL_ID.
- */
-const hasUi = process.env.PLAYWRIGHT_UI === '1';
-const briefId = process.env.DEMO_E2E_BRIEF_ID;
-const propertyId = process.env.DEMO_E2E_PROPERTY_ID;
-const dealId = process.env.DEMO_E2E_DEAL_ID;
+import { resolveDemoIds } from './helpers/demo-ids';
 
 test.describe('Buyer agent demo UI smoke', () => {
-  test.skip(!hasUi, 'Set PLAYWRIGHT_UI=1 and run pnpm test:e2e:install');
-  test.skip(!briefId || !propertyId || !dealId, 'Set DEMO_E2E_BRIEF_ID, DEMO_E2E_PROPERTY_ID, DEMO_E2E_DEAL_ID');
+  let briefId: string;
+  let propertyId: string;
+  let dealId: string;
+
+  test.beforeAll(async ({}, testInfo) => {
+    const ids = resolveDemoIds();
+    if (!ids) {
+      testInfo.skip(
+        true,
+        'Run API demo flow first (pnpm test:e2e) or set DEMO_E2E_BRIEF_ID, DEMO_E2E_PROPERTY_ID, DEMO_E2E_DEAL_ID',
+      );
+      return;
+    }
+    briefId = ids.DEMO_E2E_BRIEF_ID;
+    propertyId = ids.DEMO_E2E_PROPERTY_ID;
+    dealId = ids.DEMO_E2E_DEAL_ID;
+  });
 
   test('agent dashboard loads', async ({ page }) => {
     await page.goto('/dashboard');
@@ -23,7 +27,7 @@ test.describe('Buyer agent demo UI smoke', () => {
 
   test('brief matches tab shows lead property', async ({ page }) => {
     await page.goto(`/briefs/${briefId}?tab=matches`);
-    await expect(page.getByText(/matches/i).first()).toBeVisible();
+    await expect(page.getByText(/review matches/i)).toBeVisible({ timeout: 30_000 });
     await expect(page.locator(`a[href*="/properties/${propertyId}"]`).first()).toBeVisible({
       timeout: 20_000,
     });
@@ -36,7 +40,8 @@ test.describe('Buyer agent demo UI smoke', () => {
 
   test('deal offer tab', async ({ page }) => {
     await page.goto(`/deals/${dealId}`);
-    await page.getByRole('button', { name: /^offer$/i }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Offer' }).click();
     await expect(page.getByText(/offer amount/i)).toBeVisible();
     await expect(page.getByText(/generate offer pdf/i)).toBeVisible();
   });

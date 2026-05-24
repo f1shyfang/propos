@@ -18,12 +18,18 @@ pnpm test:e2e
 
 Starts `pnpm dev` automatically unless a server is already on port 3000.
 
-## Optional UI smoke
+## UI smoke
+
+Browser checks run automatically after the API flow (`ui` project depends on `api`). IDs are written to `test-results/demo-ids.json`.
+
+Install Chromium once:
 
 ```bash
 pnpm test:e2e:install
-PLAYWRIGHT_UI=1 DEMO_E2E_BRIEF_ID=… DEMO_E2E_PROPERTY_ID=… DEMO_E2E_DEAL_ID=… \
-  pnpm test:e2e e2e/demo-flow.ui.spec.ts
 ```
 
-After an API run, copy the JSON line printed by `expose ids for optional UI smoke run`.
+Run only UI smoke (after a prior full run or with env vars):
+
+```bash
+pnpm test:e2e e2e/demo-flow.ui.spec.ts --project=ui
+```

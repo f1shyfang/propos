@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useParams } from "next/navigation";
 import { useQueryState } from "nuqs";
 import { Icon } from "@/components/shared/icon";
@@ -154,7 +154,7 @@ function filterToParams(f: FilterState): URLSearchParams {
 
 type Tab = "matches" | "shortlist" | "roadmap" | "profile";
 
-export default function BriefDetailPage() {
+function BriefDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useQueryState<Tab>("tab", {
     defaultValue: "matches",
@@ -1865,5 +1865,17 @@ function RoadmapTab({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BriefDetailPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ padding: 40, color: "var(--pg-text-dim)" }}>Loading…</div>
+      }
+    >
+      <BriefDetailPage />
+    </Suspense>
   );
 }

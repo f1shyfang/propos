@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = Number(process.env.PORT) || 3000;
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${PORT}`;
+/** Use localhost so Playwright matches Next dev (avoids blocked HMR / hydration on 127.0.0.1). */
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -24,6 +25,7 @@ export default defineConfig({
     {
       name: 'ui',
       testMatch: /demo-flow\.ui\.spec\.ts/,
+      dependencies: ['api'],
       use: { ...devices['Desktop Chrome'] },
     },
   ],

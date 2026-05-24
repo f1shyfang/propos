@@ -15,6 +15,7 @@ import {
   submitFeedback,
   DEMO_CLIENT_EMAIL,
 } from './helpers/demo-api';
+import { writeDemoIds } from './helpers/demo-ids';
 
 /**
  * End-to-end demo lifecycle (presenter script phases 1–11, API-backed).
@@ -151,12 +152,14 @@ test.describe('Buyer agent demo flow', () => {
   });
 
   test('expose ids for optional UI smoke run', async ({}, testInfo) => {
+    const ids = {
+      DEMO_E2E_BRIEF_ID: String(briefId),
+      DEMO_E2E_PROPERTY_ID: leadPropertyId,
+      DEMO_E2E_DEAL_ID: String(dealId),
+    };
+    writeDemoIds(ids);
     await testInfo.attach('demo-ids', {
-      body: JSON.stringify({
-        DEMO_E2E_BRIEF_ID: String(briefId),
-        DEMO_E2E_PROPERTY_ID: leadPropertyId,
-        DEMO_E2E_DEAL_ID: String(dealId),
-      }),
+      body: JSON.stringify(ids),
       contentType: 'application/json',
     });
   });
