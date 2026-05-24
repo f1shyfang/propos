@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { propertiesTable, suburbsTable } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import { PropertyThumb } from '@/components/shared/property-thumb';
@@ -37,6 +37,37 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
   const { properties: p, suburbs: s } = rows[0];
   const matchScore = scoreToMatchPct(p.overallScore);
+
+  type SchoolRow = { id: number; name: string; type: string | null; sector: string | null; distanceKm: number };
+  let nearbySchools: SchoolRow[] = [];
+  // Correct for swapped lat/lng: valid AU lat is -45 to -10
+  const trueLat = (p.latitude != null && p.latitude >= -45 && p.latitude <= -10) ? p.latitude : p.longitude;
+  const trueLng = (p.latitude != null && p.latitude >= -45 && p.latitude <= -10) ? p.longitude : p.latitude;
+
+  if (trueLat != null && trueLng != null) {
+    const schoolRows = await db.execute(sql`
+      SELECT id, name, type, sector, distance_km FROM (
+        SELECT DISTINCT ON (name) id, name, type, sector,
+          round((ST_Distance(
+            ST_SetSRID(ST_Point(${trueLng}, ${trueLat}), 4326)::geography,
+            ST_SetSRID(ST_Point(longitude, latitude), 4326)::geography
+          ) / 1000)::numeric, 2) AS distance_km
+        FROM schools
+        WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+        ORDER BY name, distance_km ASC
+      ) deduped
+      ORDER BY distance_km ASC
+      LIMIT 5
+    `);
+    const raw = (schoolRows as unknown as { rows: Array<Record<string, unknown>> }).rows ?? schoolRows;
+    nearbySchools = (raw as Array<Record<string, unknown>>).map(r => ({
+      id: r.id as number,
+      name: r.name as string,
+      type: r.type as string | null,
+      sector: r.sector as string | null,
+      distanceKm: Number(r.distance_km),
+    }));
+  }
   const price = formatPrice(p.price, p.priceDisplay);
 
   const propTypeLabel = p.propertyType
@@ -158,8 +189,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               {s && (
                 <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.65, color: 'var(--pg-text)' }}>
                   {s.name} suburb — population {s.population?.toLocaleString() ?? '—'}.
-                  {s.crimeRank ? ` Crime rank: ${s.crimeRank}.` : ''}
-                  {s.crimeTrendSummary ? ` ${s.crimeTrendSummary}` : ''}
                 </p>
               )}
             </div>
@@ -190,6 +219,35 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 ))}
               </div>
             </div>
+
+            {/* Nearby Schools */}
+            {nearbySchools.length > 0 && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>
+                  <h3 className="pg-display" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Nearby Schools</h3>
+                  <span style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>Closest {nearbySchools.length}</span>
+                </div>
+                <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
+                  {nearbySchools.map((school, i) => (
+                    <div key={school.id} style={{
+                      display: 'grid', gridTemplateColumns: '1fr auto',
+                      padding: '11px 16px', fontSize: 13, alignItems: 'center',
+                      borderBottom: i < nearbySchools.length - 1 ? '1px solid var(--pg-border)' : 'none',
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 500 }}>{school.name}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--pg-text-faint)', marginTop: 2 }}>
+                          {[school.type, school.sector].filter(Boolean).map(v => v!.charAt(0).toUpperCase() + v!.slice(1)).join(' · ')}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span className="pg-mono" style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>{school.distanceKm} km</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* CMA table — static demo */}
             <div>
@@ -260,6 +318,39 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               )}
             </div>
           </div>
+
+          {/* Crime & Safety */}
+          {s && (s.crimeRank != null || s.violentPer1000 != null || s.propertyPer1000 != null) && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span className="pg-label">Crime &amp; Safety</span>
+                {s.crimeRank != null && (
+                  <span className={`pg-badge ${s.crimeRank <= 30 ? 'pg-badge-green' : s.crimeRank <= 70 ? 'pg-badge-yellow' : 'pg-badge-red'}`} style={{ fontSize: 10 }}>
+                    Rank {s.crimeRank}
+                  </span>
+                )}
+              </div>
+              <div className="pg-card-flat" style={{ padding: 14 }}>
+                {s.violentPer1000 != null && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 12.5, borderBottom: '1px solid var(--pg-border)' }}>
+                    <span style={{ color: 'var(--pg-text-dim)' }}>Violent crime / 1,000</span>
+                    <span className="pg-mono">{s.violentPer1000.toFixed(1)}</span>
+                  </div>
+                )}
+                {s.propertyPer1000 != null && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 12.5, borderBottom: s.crimeTrendSummary ? '1px solid var(--pg-border)' : 'none' }}>
+                    <span style={{ color: 'var(--pg-text-dim)' }}>Property crime / 1,000</span>
+                    <span className="pg-mono">{s.propertyPer1000.toFixed(1)}</span>
+                  </div>
+                )}
+                {s.crimeTrendSummary && (
+                  <div style={{ paddingTop: 8, fontSize: 12, color: 'var(--pg-text-dim)', lineHeight: 1.5 }}>
+                    {s.crimeTrendSummary}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Risk overlay — static */}
           <div>

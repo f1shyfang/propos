@@ -52,12 +52,7 @@ export default async function PropertiesPage() {
       };
     });
 
-  const defaultCenter: [number, number] = initialPins.length
-    ? [
-        initialPins.reduce((s, p) => s + p.lat, 0) / initialPins.length,
-        initialPins.reduce((s, p) => s + p.lng, 0) / initialPins.length,
-      ]
-    : [-37.8136, 144.9631];
+  const defaultCenter: [number, number] = [-33.8891, 151.1750]; // Chippendale, Sydney
 
   return (
     <PropertiesView initialPins={initialPins} defaultCenter={defaultCenter} />

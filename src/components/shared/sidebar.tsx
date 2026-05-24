@@ -1,11 +1,11 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { Icon } from './icon';
 import { Logo } from './logo';
 import type { UserDisplay } from '@/lib/user-display';
 
 interface SidebarProps {
-  active?: string;
   user?: UserDisplay;
 }
 
@@ -19,7 +19,9 @@ const items = [
   { id: 'docs', icon: 'folder' as const, label: 'Documents', href: '/docs' },
 ];
 
-export function Sidebar({ active = 'dashboard', user }: SidebarProps) {
+export function Sidebar({ user }: SidebarProps) {
+  const pathname = usePathname();
+  const active = items.find(item => pathname === item.href || pathname.startsWith(item.href + '/'))?.id ?? 'dashboard';
   const displayName = user?.name ?? 'Agent';
   const displayOrg = user?.org ?? "Buyer's agency";
   const initials = user?.initials ?? displayName.slice(0, 2).toUpperCase();

@@ -52,12 +52,7 @@ export function PropertyMap({ initialPins, defaultCenter, searchParams }: {
     }, 350);
   }, [searchParams]);
 
-  const center = initialPins.length
-    ? [
-        initialPins.reduce((s, p) => s + p.lat, 0) / initialPins.length,
-        initialPins.reduce((s, p) => s + p.lng, 0) / initialPins.length,
-      ] as [number, number]
-    : defaultCenter;
+  const center = defaultCenter;
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
