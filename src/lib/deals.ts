@@ -21,6 +21,7 @@ const ACTIVE_STATUSES = [
   'under_contract',
   'unconditional',
 ] as const;
+const PIPELINE_STATUSES = [...ACTIVE_STATUSES, 'settled'] as const;
 const TERMINAL_STATUSES = ['settled', 'lost', 'withdrawn'] as const;
 
 export type DealSummaryRow = {
@@ -96,14 +97,13 @@ export function validateStatusTransition(from: string, to: string): boolean {
   if (from === to) return true;
   if (from === 'lost' || from === 'withdrawn') return false;
 
-  const fromIdx = ACTIVE_STATUSES.indexOf(from as typeof ACTIVE_STATUSES[number]);
-  const toIdx = ACTIVE_STATUSES.indexOf(to as typeof ACTIVE_STATUSES[number]);
+  const fromIdx = PIPELINE_STATUSES.indexOf(from as typeof PIPELINE_STATUSES[number]);
+  const toIdx = PIPELINE_STATUSES.indexOf(to as typeof PIPELINE_STATUSES[number]);
 
   if (fromIdx >= 0 && toIdx >= 0) {
-    return toIdx >= fromIdx;
+    return true;
   }
 
-  if (fromIdx >= 0 && to === 'settled') return true;
   if (fromIdx >= 0 && (to === 'lost' || to === 'withdrawn')) return true;
 
   return false;

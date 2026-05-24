@@ -54,5 +54,9 @@ export async function patchDealStatus(dealId: number, status: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   });
-  return res.ok;
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? 'Could not update deal status');
+  }
+  return true;
 }

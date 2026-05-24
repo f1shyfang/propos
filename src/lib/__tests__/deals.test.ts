@@ -40,9 +40,12 @@ describe('validateStatusTransition', () => {
     expect(validateStatusTransition('suggested', 'due_diligence')).toBe(true);
   });
 
-  it('rejects backward transitions', () => {
-    expect(validateStatusTransition('settled', 'suggested')).toBe(false);
-    expect(validateStatusTransition('under_contract', 'offer_made')).toBe(false);
+  it('allows backward transitions through visible pipeline stages', () => {
+    expect(validateStatusTransition('under_contract', 'offer_made')).toBe(true);
+    expect(validateStatusTransition('offer_made', 'due_diligence')).toBe(true);
+    expect(validateStatusTransition('due_diligence', 'approved')).toBe(true);
+    expect(validateStatusTransition('approved', 'suggested')).toBe(true);
+    expect(validateStatusTransition('settled', 'under_contract')).toBe(true);
   });
 
   it('rejects transition from terminal lost/withdrawn', () => {
