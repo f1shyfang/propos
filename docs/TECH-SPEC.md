@@ -5,6 +5,7 @@
 
 ---
 
+
 ## 1. Architecture Overview
 
 The entire platform runs as a **Next.js 16 App Router monolith** — a single process serving pages, API routes, and static assets. No separate backend service, no Docker Compose, no message queues. Supabase provides hosted Postgres, auth, and storage. The architecture follows the modular-monolith principle described in `docs/blueprint/05-system-architecture.md` §1.2.
