@@ -62,11 +62,23 @@ export default function DealDetailPage() {
   const [cma, setCma] = useState<{ comparables: CMAComp[]; estimatedValue: number | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setLoadError(null);
     const res = await fetch(`/api/deals/${id}`);
-    if (!res.ok) { setLoading(false); return; }
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setLoadError(
+        typeof data === 'object' && data && 'error' in data
+          ? String(data.error)
+          : res.status === 404
+            ? 'Deal not found.'
+            : `Could not load deal (${res.status}).`,
+      );
+      setLoading(false);
+      return;
+    }
     setDeal(data.deal);
     setChecklist(data.checklist ?? []);
     setMilestones(data.milestones ?? []);
@@ -107,7 +119,13 @@ export default function DealDetailPage() {
   }
 
   if (loading) return <div style={{ padding: 40, color: 'var(--pg-text-dim)' }}>Loading deal…</div>;
-  if (!deal) return <div style={{ padding: 40, color: 'var(--pg-red)' }}>Deal not found.</div>;
+  if (!deal) {
+    return (
+      <div style={{ padding: 40, color: 'var(--pg-red)' }}>
+        {loadError ?? 'Deal not found.'}
+      </div>
+    );
+  }
 
   const daysToSettlement = deal.settlementDate
     ? Math.round((new Date(deal.settlementDate).getTime() - Date.now()) / 86400000)
