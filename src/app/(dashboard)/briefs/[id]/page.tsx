@@ -14,6 +14,8 @@ import {
   type RoadmapMilestone,
 } from "@/lib/roadmap-utils";
 import { GanttRoadmap } from "@/components/shared/gantt-roadmap";
+import Link from "next/link";
+import { ShortlistDealButton } from "@/components/deals/shortlist-deal-button";
 
 interface BriefMatch {
   id: string;
