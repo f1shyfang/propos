@@ -385,7 +385,7 @@ function AudioIntakeZone({ fileInputRef, phase, error, onFile }: {
         <div style={{ fontSize: 13, color: 'var(--pg-text-dim)', marginTop: 6, maxWidth: 380, margin: '6px auto 0' }}>
           {busy
             ? 'Please wait…'
-            : 'Drop a call recording here or click to browse — we\'ll auto-fill the form from the transcript'}
+            : 'Drop a call recording here or click to browse (mp3, m4a, wav, webm) — we\'ll auto-fill the form from the transcript'}
         </div>
         {!busy && (
           <button type="button" className="pg-btn pg-btn-primary" style={{ marginTop: 20 }}
@@ -396,7 +396,7 @@ function AudioIntakeZone({ fileInputRef, phase, error, onFile }: {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".m4a,audio/m4a,audio/mp4,audio/*"
+          accept=".m4a,.mp3,.mp4,.wav,.webm,.ogg,.flac,audio/*"
           style={{ display: 'none' }}
           disabled={busy}
           onChange={e => {

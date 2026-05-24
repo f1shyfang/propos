@@ -18,9 +18,6 @@ export async function POST(req: NextRequest) {
     .where(eq(buyerBriefsTable.id, id));
 
   if (!brief) return NextResponse.json({ error: 'Brief not found' }, { status: 404 });
-  if (!brief.clientUserId) {
-    return NextResponse.json({ error: 'Brief has no linked client' }, { status: 400 });
-  }
 
   const now = new Date();
   const ids = Array.isArray(shortlistIds)

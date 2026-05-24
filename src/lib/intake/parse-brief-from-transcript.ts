@@ -9,7 +9,6 @@ import {
   PRE_APPROVAL_STATUSES,
   PROPERTY_TYPES,
   PURCHASE_PURPOSES,
-  SYDNEY_SUBURBS,
   URGENCY_OPTIONS,
   type BriefFormPayload,
 } from '@/lib/brief-field-options';
@@ -75,10 +74,7 @@ function pickEnum<T extends readonly string[]>(value: string | null | undefined,
 }
 
 function normalizeSuburb(name: string): string {
-  const trimmed = name.trim();
-  const match = SYDNEY_SUBURBS.find((s) => s.toLowerCase() === trimmed.toLowerCase());
-  if (match) return match;
-  return trimmed.split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  return name.trim().split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 }
 
 function normalizeIdList(values: string[] | null | undefined, allowed: readonly string[]): string[] {

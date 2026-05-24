@@ -178,8 +178,6 @@ function BriefDetailPage() {
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [shortlisting, setShortlisting] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
-  const [linkEmail, setLinkEmail] = useState("");
-  const [linking, setLinking] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [shareHandoffUrl, setShareHandoffUrl] = useState<string | null>(null);
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
@@ -409,24 +407,6 @@ function BriefDetailPage() {
       setShareLinkCopied(true);
       setTimeout(() => setShareLinkCopied(false), 2000);
     });
-  }
-
-  async function linkClient() {
-    setLinking(true);
-    setShareMessage(null);
-    const res = await fetch(`/api/briefs/${id}/link-client`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: linkEmail || brief?.email }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (res.ok) {
-      setShareMessage("Client linked to this brief");
-      await reloadBrief();
-    } else {
-      setShareMessage(body.error ?? "Could not link client");
-    }
-    setLinking(false);
   }
 
   async function removeShortlist(shortlistId: number) {
@@ -816,32 +796,6 @@ function BriefDetailPage() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                {!brief.clientUserId && (
-                  <>
-                    <input
-                      className="pg-input"
-                      style={{ maxWidth: 260, fontSize: 13 }}
-                      placeholder={`Client email (${brief.email})`}
-                      value={linkEmail}
-                      onChange={(e) => setLinkEmail(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="pg-btn pg-btn-sm"
-                      disabled={linking}
-                      onClick={linkClient}
-                    >
-                      {linking ? (
-                        <>
-                          <Spinner />
-                          Linking…
-                        </>
-                      ) : (
-                        "Link client"
-                      )}
-                    </button>
-                  </>
-                )}
                 {shareMessage && (
                   <span
                     style={{
@@ -859,7 +813,7 @@ function BriefDetailPage() {
               <button
                 type="button"
                 className="pg-btn pg-btn-primary"
-                disabled={sharing || shortlist.length === 0 || !brief.clientUserId}
+                disabled={sharing || shortlist.length === 0}
                 onClick={() => shareWithClient()}
               >
                 <Icon name="share" size={13} />
@@ -1069,7 +1023,7 @@ function BriefDetailPage() {
                           <a href={`/properties/${p.id}`} className="pg-btn pg-btn-sm">
                             View
                           </a>
-                          {!s.sharedAt && brief.clientUserId && (
+                          {!s.sharedAt && (
                             <button
                               type="button"
                               className="pg-btn pg-btn-sm"
