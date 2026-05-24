@@ -233,6 +233,25 @@ export const buyerBriefsTable = pgTable("buyer_briefs", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// ── Brief match cache (precomputed property matches per brief + filter set) ───
+export const briefMatchCacheTable = pgTable(
+  "brief_match_cache",
+  {
+    id: serial("id").primaryKey(),
+    briefId: integer("brief_id")
+      .notNull()
+      .references(() => buyerBriefsTable.id, { onDelete: "cascade" }),
+    criteriaHash: text("criteria_hash").notNull().default(""),
+    matches: jsonb("matches").$type<Array<Record<string, unknown>>>().notNull(),
+    total: integer("total").notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("brief_match_cache_brief_criteria_unique").on(table.briefId, table.criteriaHash),
+    index("brief_match_cache_brief_id_idx").on(table.briefId),
+  ],
+);
+
 // ── Intake transcriptions (audio/text → parsed brief audit trail) ─────────────
 export const intakeTranscriptionsTable = pgTable("intake_transcriptions", {
   id: serial("id").primaryKey(),
@@ -366,6 +385,7 @@ export const offMarketPropertiesTable = pgTable("off_market_properties", {
   expectedListingDate: timestamp("expected_listing_date", { withTimezone: true }),
   internalNotes: text("internal_notes"),
   confidential: boolean("confidential").default(false),
+  images: jsonb("images").$type<string[]>().default([]),
   lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),

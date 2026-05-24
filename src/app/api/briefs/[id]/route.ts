@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { buyerBriefsTable, propertiesTable, shortlistsTable } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { scoreToMatchPct, formatPrice } from '@/lib/utils';
+import { invalidateBriefMatchCache } from '@/lib/brief-match-cache';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -67,5 +68,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .returning();
 
   if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const matchCriteriaKeys = ['suburbs', 'propertyTypes', 'budgetMin', 'budgetMax', 'minBeds', 'minBaths', 'parking', 'mustHaves', 'dealBreakers'];
+  if (matchCriteriaKeys.some((key) => key in update)) {
+    await invalidateBriefMatchCache(briefId);
+  }
+
   return NextResponse.json({ brief: updated });
 }

@@ -1,20 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@/components/shared/icon';
 import { TopBar } from '@/components/shared/top-bar';
 import { calcFollowUpOverdue, SOURCE_TYPES, ACCESS_STATUSES, VENDOR_MOTIVATIONS } from '@/lib/off-market-utils';
-
-interface OffMarketProperty {
-  id: number; address: string; suburb: string; state: string | null;
-  propertyType: string | null; bedrooms: number | null; bathrooms: number | null;
-  priceMin: number | null; priceMax: number | null;
-  sourceType: string; accessStatus: string; vendorMotivation: string;
-  sellingAgentName: string | null; sellingAgentPhone: string | null;
-  howSourced: string | null; internalNotes: string | null;
-  confidential: boolean; lastContactedAt: string | null; createdAt: string;
-  expectedListingDate: string | null;
-}
+import { PropertyThumb } from '@/components/shared/property-thumb';
+import { queryKeys } from '@/lib/queries/keys';
+import {
+  createOffMarketProperty,
+  deleteOffMarketProperty,
+  fetchOffMarketProperties,
+  touchOffMarketContact,
+  type OffMarketProperty,
+} from '@/lib/queries/off-market';
 
 type Filter = 'all' | 'pre_market' | 'off_market' | 'confidential';
 
@@ -50,29 +49,48 @@ function daysSince(iso: string | null): number | null {
 }
 
 export default function OffMarketPage() {
-  const [properties, setProperties] = useState<OffMarketProperty[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
   const [showForm, setShowForm] = useState(false);
 
-  async function load() {
-    const res = await fetch('/api/off-market');
-    if (res.ok) setProperties((await res.json()).properties ?? []);
-    setLoading(false);
+  const { data, isLoading: loading } = useQuery({
+    queryKey: queryKeys.offMarket.all,
+    queryFn: fetchOffMarketProperties,
+  });
+
+  const properties = data?.properties ?? [];
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.offMarket.all });
+
+  const touchMutation = useMutation({
+    mutationFn: touchOffMarketContact,
+    onSuccess: invalidate,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteOffMarketProperty,
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.offMarket.all });
+      const previous = queryClient.getQueryData<{ properties: OffMarketProperty[] }>(queryKeys.offMarket.all);
+      queryClient.setQueryData<{ properties: OffMarketProperty[] }>(queryKeys.offMarket.all, (old) => ({
+        properties: (old?.properties ?? []).filter((p) => p.id !== id),
+      }));
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.offMarket.all, context.previous);
+      }
+    },
+    onSettled: invalidate,
+  });
+
+  function markContacted(id: number) {
+    touchMutation.mutate(id);
   }
 
-  useEffect(() => { load(); }, []);
-
-  async function markContacted(id: number) {
-    await fetch(`/api/off-market/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ touchLastContacted: true }),
-    });
-    load();
-  }
-
-  async function deleteProperty(id: number) {
-    await fetch(`/api/off-market/${id}`, { method: 'DELETE' });
-    setProperties(p => p.filter(x => x.id !== id));
+  function deleteProperty(id: number) {
+    deleteMutation.mutate(id);
   }
 
   const filtered = properties.filter(p => {
@@ -126,10 +144,11 @@ export default function OffMarketPage() {
         {filtered.length > 0 && (
           <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
             <div style={{
-              display: 'grid', gridTemplateColumns: '2.5fr 0.9fr 1fr 0.9fr 1fr 0.8fr',
+              display: 'grid', gridTemplateColumns: '56px 2.2fr 0.9fr 1fr 0.9fr 1fr 0.8fr',
               padding: '10px 16px', borderBottom: '1px solid var(--pg-border)',
               fontSize: 10.5, color: 'var(--pg-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500,
             }}>
+              <span />
               <span>Property</span><span>Price guide</span><span>Access</span>
               <span>Motivation</span><span>Source</span><span style={{ textAlign: 'right' }}>Last contact</span>
             </div>
@@ -138,11 +157,17 @@ export default function OffMarketPage() {
               const days = daysSince(p.lastContactedAt);
               return (
                 <div key={p.id} style={{
-                  display: 'grid', gridTemplateColumns: '2.5fr 0.9fr 1fr 0.9fr 1fr 0.8fr',
+                  display: 'grid', gridTemplateColumns: '56px 2.2fr 0.9fr 1fr 0.9fr 1fr 0.8fr',
                   padding: '12px 16px', alignItems: 'center', fontSize: 13,
                   borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
                   background: overdue ? 'rgba(239,68,68,0.03)' : undefined,
                 }}>
+                  <PropertyThumb
+                    seed={p.id % 6}
+                    height={44}
+                    imageUrl={p.images?.[0] ?? null}
+                    style={{ width: 44, borderRadius: 6 }}
+                  />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontWeight: 500 }} className="pg-truncate">{p.address}</span>
@@ -196,7 +221,15 @@ export default function OffMarketPage() {
         )}
       </div>
 
-      {showForm && <AddOffMarketModal onClose={() => setShowForm(false)} onCreated={() => { load(); setShowForm(false); }} />}
+      {showForm && (
+        <AddOffMarketModal
+          onClose={() => setShowForm(false)}
+          onCreated={() => {
+            invalidate();
+            setShowForm(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -208,31 +241,20 @@ function AddOffMarketModal({ onClose, onCreated }: { onClose: () => void; onCrea
     vendorMotivation: 'unknown', sellingAgentName: '', sellingAgentPhone: '', sellingAgentEmail: '',
     expectedListingDate: '', internalNotes: '', confidential: false,
   });
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  async function save() {
-    setSaving(true);
-    setError('');
-    const res = await fetch('/api/off-market', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        bedrooms: form.bedrooms ? Number(form.bedrooms) : null,
-        bathrooms: form.bathrooms ? Number(form.bathrooms) : null,
-        parkingSpaces: form.parkingSpaces ? Number(form.parkingSpaces) : null,
-        priceMin: form.priceMin ? Number(form.priceMin) : null,
-        priceMax: form.priceMax ? Number(form.priceMax) : null,
-      }),
-    });
-    if (res.ok) {
-      onCreated();
-    } else {
-      const d = await res.json();
-      setError(d.error ?? 'Failed to save');
-      setSaving(false);
-    }
-  }
+  const createMutation = useMutation({
+    mutationFn: () => createOffMarketProperty({
+      ...form,
+      bedrooms: form.bedrooms ? Number(form.bedrooms) : null,
+      bathrooms: form.bathrooms ? Number(form.bathrooms) : null,
+      parkingSpaces: form.parkingSpaces ? Number(form.parkingSpaces) : null,
+      priceMin: form.priceMin ? Number(form.priceMin) : null,
+      priceMax: form.priceMax ? Number(form.priceMax) : null,
+    }),
+    onSuccess: () => onCreated(),
+    onError: (err) => setError(err instanceof Error ? err.message : 'Failed to save'),
+  });
 
   const field = (key: keyof typeof form, label: string, type: string = 'text', placeholder = '') => (
     <div>
@@ -298,8 +320,8 @@ function AddOffMarketModal({ onClose, onCreated }: { onClose: () => void; onCrea
           {error && <div style={{ fontSize: 12, color: 'var(--pg-red)' }}>{error}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
             <button className="pg-btn" onClick={onClose}>Cancel</button>
-            <button className="pg-btn pg-btn-primary" onClick={save} disabled={saving}>
-              {saving ? 'Adding…' : 'Add property'}
+            <button className="pg-btn pg-btn-primary" onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Adding…' : 'Add property'}
             </button>
           </div>
         </div>

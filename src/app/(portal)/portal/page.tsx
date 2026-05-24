@@ -1,26 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@/components/shared/icon';
 import { PropertyThumb } from '@/components/shared/property-thumb';
 import { FeedbackButtons } from '@/components/shared/feedback-buttons';
-
-interface ShortlistItem {
-  shortlistId: number;
-  briefId: number | null;
-  clientName: string;
-  agentNote: string | null;
-  feedbackStatus: string;
-  feedbackText: string | null;
-  feedbackReason: string | null;
-  property: {
-    id: string; address: string; suburb: string | null; state: string | null;
-    price: string; propertyType: string | null;
-    bedrooms: number | null; bathrooms: number | null; parkingSpaces: number | null;
-    score: number;
-  } | null;
-}
+import { queryKeys } from '@/lib/queries/keys';
+import { fetchMe, fetchPortalShortlists, type PortalShortlistItem } from '@/lib/queries/portal';
 
 const TASKS = [
   { l: 'Confirm cooling-off decision', done: true, when: 'Completed 22 May' },
@@ -62,32 +49,22 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function ClientPortalPage() {
-  const [items, setItems] = useState<ShortlistItem[]>([]);
-  const [userName, setUserName] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [urlInput, setUrlInput] = useState('');
 
-  const load = useCallback(async () => {
-    const [portalRes, meRes] = await Promise.all([
-      fetch('/api/portal/shortlists'),
-      fetch('/api/me'),
-    ]);
-    if (portalRes.ok) {
-      const data = await portalRes.json();
-      setItems(data.items ?? []);
-    }
-    if (meRes.ok) {
-      const me = await meRes.json();
-      setUserName(me.name?.split(' ')[0] ?? me.name);
-    }
-    setLoading(false);
-  }, []);
+  const { data: shortlistData, isLoading: shortlistsLoading } = useQuery({
+    queryKey: queryKeys.portal.shortlists,
+    queryFn: fetchPortalShortlists,
+    refetchInterval: 5000,
+  });
 
-  useEffect(() => {
-    load();
-    const id = setInterval(load, 5000);
-    return () => clearInterval(id);
-  }, [load]);
+  const { data: meData } = useQuery({
+    queryKey: queryKeys.me,
+    queryFn: fetchMe,
+  });
+
+  const items: PortalShortlistItem[] = shortlistData?.items ?? [];
+  const loading = shortlistsLoading;
+  const userName = meData?.name?.split(' ')[0] ?? meData?.name ?? null;
 
   const properties = items.filter((it) => it.property);
   const hasShortlist = properties.length > 0;

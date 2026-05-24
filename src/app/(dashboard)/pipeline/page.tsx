@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
   DragOverlay,
@@ -18,19 +19,19 @@ import { Icon } from '@/components/shared/icon';
 import { MatchScore } from '@/components/shared/match-score';
 import { InlineAlert } from '@/components/shared/inline-alert';
 import { getDealStatusLabel, DEAL_STATUSES } from '@/lib/deal-utils';
-import { patchDealStatus } from '@/lib/create-deal-client';
+import { queryKeys } from '@/lib/queries/keys';
+import { fetchBriefs, fetchBriefMatchesAll, type BriefMatchItem } from '@/lib/queries/briefs';
+import {
+  createDeal,
+  fetchDeals,
+  patchDealStatus,
+  type PipelineDeal,
+} from '@/lib/queries/deals';
 
-interface LiveDeal {
-  id: number; status: string; offerSubState: string | null; offerAmount: number | null;
-  priority: string; isAuction: boolean; exchangeDate: string | null; settlementDate: string | null;
-  clientName: string | null; propertyId: string | null;
-  address: string | null; suburb: string | null; state: string | null;
-  price: number | null; priceDisplay: string | null; overallScore: number | null;
-  createdAt: string;
+function formatPropertyOption(p: BriefMatchItem): string {
+  const location = [p.suburb, p.state].filter(Boolean).join(', ');
+  return [p.address ?? 'Unknown address', location, p.price].filter(Boolean).join(' · ');
 }
-
-type Brief = { id: number; clientName: string };
-type Property = { id: string; address: string; suburb: string | null; priceDisplay: string | null; price: number | null };
 
 const COLUMN_CONFIG: Record<string, { dot?: string; muted?: boolean }> = {
   suggested: { dot: 'var(--pg-text-faint)', muted: true },
@@ -50,35 +51,50 @@ function fmt(n: number | null, display: string | null): string {
   return `$${(n / 1000).toFixed(0)}K`;
 }
 
-function colValue(deals: LiveDeal[]): string {
+function colValue(deals: PipelineDeal[]): string {
   const total = deals.reduce((s, d) => s + (d.price ?? d.offerAmount ?? 0), 0);
   if (!total) return '—';
   return total >= 1_000_000 ? `$${(total / 1_000_000).toFixed(1)}M` : `$${(total / 1000).toFixed(0)}K`;
 }
 
 export default function PipelinePage() {
-  const [deals, setDeals] = useState<LiveDeal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
-  const [activeDeal, setActiveDeal] = useState<LiveDeal | null>(null);
+  const [activeDeal, setActiveDeal] = useState<PipelineDeal | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const load = useCallback(async () => {
-    setError(null);
-    const res = await fetch('/api/deals');
-    if (res.ok) {
-      setDeals((await res.json()).deals ?? []);
-    } else {
-      setError('Could not load pipeline. Try refreshing.');
-    }
-    setLoading(false);
-  }, []);
+  const { data: dealsData, isLoading: loading, isError } = useQuery({
+    queryKey: queryKeys.deals.all,
+    queryFn: fetchDeals,
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const deals = dealsData?.deals ?? [];
 
-  async function handleDragEnd(event: DragEndEvent) {
+  const statusMutation = useMutation({
+    mutationFn: ({ dealId, status }: { dealId: number; status: string }) =>
+      patchDealStatus(dealId, status),
+    onMutate: async ({ dealId, status }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.deals.all });
+      const previous = queryClient.getQueryData<{ deals: PipelineDeal[] }>(queryKeys.deals.all);
+      queryClient.setQueryData<{ deals: PipelineDeal[] }>(queryKeys.deals.all, (old) => ({
+        deals: (old?.deals ?? []).map((d) => (d.id === dealId ? { ...d, status } : d)),
+      }));
+      return { previous };
+    },
+    onError: (_err, { status }, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.deals.all, context.previous);
+      }
+      setError(`Could not move deal to ${getDealStatusLabel(status)}`);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.deals.all });
+    },
+  });
+
+  function handleDragEnd(event: DragEndEvent) {
     setActiveDeal(null);
     const { active, over } = event;
     if (!over) return;
@@ -90,14 +106,8 @@ export default function PipelinePage() {
     const deal = deals.find((d) => d.id === dealId);
     if (!deal || deal.status === newStatus) return;
 
-    const prev = deals;
-    setDeals((ds) => ds.map((d) => (d.id === dealId ? { ...d, status: newStatus } : d)));
-
-    const ok = await patchDealStatus(dealId, newStatus);
-    if (!ok) {
-      setDeals(prev);
-      setError(`Could not move deal to ${getDealStatusLabel(newStatus)}`);
-    }
+    setError(null);
+    statusMutation.mutate({ dealId, status: newStatus });
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -105,7 +115,7 @@ export default function PipelinePage() {
     setActiveDeal(deal ?? null);
   }
 
-  const byStatus = COLUMNS.reduce<Record<string, LiveDeal[]>>((acc, s) => {
+  const byStatus = COLUMNS.reduce<Record<string, PipelineDeal[]>>((acc, s) => {
     acc[s] = deals.filter((d) => d.status === s);
     return acc;
   }, {});
@@ -134,9 +144,9 @@ export default function PipelinePage() {
         }
       />
 
-      {error && (
+      {(error || isError) && (
         <div style={{ padding: '0 24px 8px' }}>
-          <InlineAlert variant="error">{error}</InlineAlert>
+          <InlineAlert variant="error">{error ?? 'Could not load pipeline. Try refreshing.'}</InlineAlert>
         </div>
       )}
 
@@ -172,7 +182,10 @@ export default function PipelinePage() {
       {showNew && (
         <NewDealModal
           onClose={() => setShowNew(false)}
-          onCreated={() => { load(); setShowNew(false); }}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.deals.all });
+            setShowNew(false);
+          }}
         />
       )}
     </div>
@@ -216,7 +229,7 @@ function KCol({
   );
 }
 
-function DraggableDealCard({ deal }: { deal: LiveDeal }) {
+function DraggableDealCard({ deal }: { deal: PipelineDeal }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
 
   const style = transform
@@ -230,7 +243,7 @@ function DraggableDealCard({ deal }: { deal: LiveDeal }) {
   );
 }
 
-function DealCardContent({ deal, dragging }: { deal: LiveDeal; dragging?: boolean }) {
+function DealCardContent({ deal, dragging }: { deal: PipelineDeal; dragging?: boolean }) {
   const scoreToMatchPct = (v: number | null) => (v == null ? 50 : Math.min(99, Math.max(1, Math.round(v / 100))));
   const daysToSettlement = deal.settlementDate
     ? Math.round((new Date(deal.settlementDate).getTime() - Date.now()) / 86400000)
@@ -282,40 +295,28 @@ function DealCardContent({ deal, dragging }: { deal: LiveDeal; dragging?: boolea
 }
 
 function NewDealModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [briefs, setBriefs] = useState<Brief[]>([]);
-  const [properties, setProperties] = useState<Property[]>([]);
   const [form, setForm] = useState({ briefId: '', propertyId: '', priority: 'standard', isAuction: false, strategyNotes: '' });
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([fetch('/api/briefs').then((r) => r.json()), fetch('/api/properties').then((r) => r.json())]).then(([b, p]) => {
-      setBriefs(b.briefs ?? []);
-      setProperties((p.properties ?? []).slice(0, 50));
-    });
-  }, []);
+  const { data: briefsData } = useQuery({
+    queryKey: queryKeys.briefs.all,
+    queryFn: fetchBriefs,
+  });
 
-  async function create() {
-    if (!form.briefId || !form.propertyId) return;
-    setSaving(true);
-    setError(null);
-    const res = await fetch('/api/deals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    const body = await res.json().catch(() => ({}));
-    setSaving(false);
-    if (res.status === 409 && body.dealId) {
-      onCreated();
-      return;
-    }
-    if (!res.ok) {
-      setError(body.error ?? 'Could not create deal');
-      return;
-    }
-    onCreated();
-  }
+  const { data: matchesData, isLoading: loadingProperties } = useQuery({
+    queryKey: queryKeys.briefs.matches(form.briefId, true),
+    queryFn: () => fetchBriefMatchesAll(form.briefId),
+    enabled: !!form.briefId,
+  });
+
+  const briefs = briefsData?.briefs ?? [];
+  const properties = matchesData?.matches ?? [];
+
+  const createMutation = useMutation({
+    mutationFn: () => createDeal(form),
+    onSuccess: () => onCreated(),
+    onError: (err) => setError(err instanceof Error ? err.message : 'Could not create deal'),
+  });
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
@@ -324,7 +325,7 @@ function NewDealModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>Client brief</label>
-            <select value={form.briefId} onChange={(e) => setForm((f) => ({ ...f, briefId: e.target.value }))}
+            <select value={form.briefId} onChange={(e) => setForm((f) => ({ ...f, briefId: e.target.value, propertyId: '' }))}
               className="pg-input" style={{ width: '100%', fontSize: 13 }}>
               <option value="">Select brief…</option>
               {briefs.map((b) => <option key={b.id} value={b.id}>{b.clientName}</option>)}
@@ -332,10 +333,23 @@ function NewDealModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
           </div>
           <div>
             <label style={{ fontSize: 12, color: 'var(--pg-text-dim)', display: 'block', marginBottom: 5 }}>Property</label>
-            <select value={form.propertyId} onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.value }))}
-              className="pg-input" style={{ width: '100%', fontSize: 13 }}>
-              <option value="">Select property…</option>
-              {properties.map((p) => <option key={p.id} value={p.id}>{p.address}{p.suburb ? ` — ${p.suburb}` : ''}</option>)}
+            <select
+              value={form.propertyId}
+              onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.value }))}
+              disabled={!form.briefId || loadingProperties || properties.length === 0}
+              className="pg-input"
+              style={{ width: '100%', fontSize: 13 }}
+            >
+              <option value="">
+                {!form.briefId
+                  ? 'Select a brief first…'
+                  : loadingProperties
+                    ? 'Loading properties…'
+                    : properties.length === 0
+                      ? 'No matching properties for this brief'
+                      : 'Select property…'}
+              </option>
+              {properties.map((p) => <option key={p.id} value={p.id}>{formatPropertyOption(p)}</option>)}
             </select>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -364,8 +378,8 @@ function NewDealModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
           {error && <InlineAlert variant="error">{error}</InlineAlert>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
             <button type="button" className="pg-btn" onClick={onClose}>Cancel</button>
-            <button type="button" className="pg-btn pg-btn-primary" onClick={create} disabled={saving || !form.briefId || !form.propertyId}>
-              {saving ? 'Creating…' : 'Create deal'}
+            <button type="button" className="pg-btn pg-btn-primary" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !form.briefId || !form.propertyId}>
+              {createMutation.isPending ? 'Creating…' : 'Create deal'}
             </button>
           </div>
         </div>

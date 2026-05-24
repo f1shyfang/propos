@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     expectedListingDate: body.expectedListingDate ? new Date(body.expectedListingDate) : null,
     internalNotes: body.internalNotes ?? null,
     confidential: body.confidential ?? false,
+    images: Array.isArray(body.images) ? body.images.filter(Boolean) : [],
     lastContactedAt: new Date(),
   }).returning();
 

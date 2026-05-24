@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Fraunces, JetBrains_Mono } from "next/font/google";
+import { QueryProvider } from "@/components/providers/query-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -33,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} h-full`}>
       <body className="min-h-full" style={{ fontFamily: 'var(--pg-font-body)', background: 'var(--pg-bg)', color: 'var(--pg-text)' }}>
-        {children}
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );
