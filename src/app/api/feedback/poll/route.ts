@@ -6,8 +6,6 @@ import { requireRole, unauthorizedResponse } from '@/lib/auth-server';
 import { formatPrice, scoreToMatchPct } from '@/lib/utils';
 
 export async function GET(req: NextRequest) {
-  const session = await requireRole('agent');
-  if (!session) return unauthorizedResponse();
 
   const sp = req.nextUrl.searchParams;
   const sinceRaw = sp.get('since');

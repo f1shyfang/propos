@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { shortlistsTable, buyerBriefsTable, propertiesTable } from '@/lib/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
-import { logAction } from '@/lib/log-action';
 import { requireRole, unauthorizedResponse } from '@/lib/auth-server';
 import { formatPrice, scoreToMatchPct } from '@/lib/utils';
 
@@ -33,8 +32,6 @@ function mapShortlistRow(row: { s: typeof shortlistsTable.$inferSelect; p: typeo
 }
 
 export async function GET(req: NextRequest) {
-  const session = await requireRole('agent');
-  if (!session) return unauthorizedResponse();
 
   const briefId = parseInt(req.nextUrl.searchParams.get('briefId') ?? '', 10);
   if (isNaN(briefId)) {
@@ -52,8 +49,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await requireRole('agent');
-  if (!session) return unauthorizedResponse();
 
   const { briefId, propertyId, agentNote } = await req.json();
   if (!briefId || !propertyId) {
@@ -91,12 +86,6 @@ export async function POST(req: NextRequest) {
     })
     .returning();
 
-  logAction({
-    userId: session.user.id,
-    actionType: 'shortlist_add',
-    entityType: 'property',
-    entityId: String(propertyId),
-  });
 
   return NextResponse.json({ shortlist }, { status: 201 });
 }

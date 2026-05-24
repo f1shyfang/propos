@@ -8,8 +8,6 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await requireRole('agent');
-  if (!session) return unauthorizedResponse();
 
   const { id } = await params;
   const briefId = parseInt(id, 10);
@@ -40,7 +38,7 @@ export async function PATCH(
 
   const [brief] = await db
     .update(buyerBriefsTable)
-    .set({ clientUserId: targetUserId, agentId: session.user.id })
+    .set({ clientUserId: targetUserId })
     .where(eq(buyerBriefsTable.id, briefId))
     .returning();
 

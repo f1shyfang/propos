@@ -3,11 +3,6 @@ import { db } from '@/lib/db';
 import { buyerBriefsTable, propertiesTable, shortlistsTable } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { scoreToMatchPct, formatPrice } from '@/lib/utils';
-import {
-  briefRowToCriteria,
-  buildPropertyMatchConditions,
-  scoreAndRankProperties,
-} from '@/lib/match-properties-for-brief';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -43,36 +38,32 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       bathrooms: row.p.bathrooms,
       parkingSpaces: row.p.parkingSpaces,
       score: scoreToMatchPct(row.p.overallScore),
+      imageUrl: (row.p.images as string[] | null)?.[0] ?? null,
     } : null,
   }));
 
-  const criteria = briefRowToCriteria(brief);
-  const whereClause = buildPropertyMatchConditions(criteria);
+  return NextResponse.json({ brief, shortlist });
+}
 
-  const candidates = await db
-    .select()
-    .from(propertiesTable)
-    .where(whereClause);
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const briefId = parseInt(id);
+  if (isNaN(briefId)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
 
-  const ranked = scoreAndRankProperties(candidates, criteria, 50);
+  const body = await req.json();
+  const allowed = ['suburbs', 'propertyTypes', 'budgetMin', 'budgetMax', 'minBeds', 'minBaths', 'parking', 'mustHaves', 'dealBreakers', 'status', 'clientName', 'email'];
+  const update: Record<string, unknown> = {};
+  for (const key of allowed) {
+    if (key in body) update[key] = body[key];
+  }
+  if (Object.keys(update).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
-  const matches = ranked.map(({ row: p, matchScore }) => ({
-    id: p.id,
-    address: p.address,
-    suburb: p.suburb,
-    state: p.state,
-    price: formatPrice(p.price, p.priceDisplay),
-    priceRaw: p.price,
-    propertyType: p.propertyType,
-    bedrooms: p.bedrooms,
-    bathrooms: p.bathrooms,
-    parkingSpaces: p.parkingSpaces,
-    days: p.days,
-    score: matchScore,
-    overallScore: scoreToMatchPct(p.overallScore),
-    underOffer: !!p.underOffer,
-    href: `/properties/${p.id}`,
-  }));
+  const [updated] = await db
+    .update(buyerBriefsTable)
+    .set({ ...update, updatedAt: new Date() })
+    .where(eq(buyerBriefsTable.id, briefId))
+    .returning();
 
-  return NextResponse.json({ brief, shortlist, matches });
+  if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  return NextResponse.json({ brief: updated });
 }

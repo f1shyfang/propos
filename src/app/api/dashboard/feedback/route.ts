@@ -5,8 +5,6 @@ import { eq, desc, isNotNull } from 'drizzle-orm';
 import { requireRole, unauthorizedResponse } from '@/lib/auth-server';
 
 export async function GET() {
-  const session = await requireRole('agent');
-  if (!session) return unauthorizedResponse();
 
   const rows = await db
     .select({

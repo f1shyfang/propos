@@ -5,8 +5,6 @@ import { eq, and, inArray } from 'drizzle-orm';
 import { requireRole, unauthorizedResponse } from '@/lib/auth-server';
 
 export async function POST(req: NextRequest) {
-  const session = await requireRole('agent');
-  if (!session) return unauthorizedResponse();
 
   const { briefId, shortlistIds } = await req.json();
   const id = Number(briefId);

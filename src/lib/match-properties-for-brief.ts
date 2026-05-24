@@ -63,7 +63,14 @@ export function propertyRowToMatchInput(
   };
 }
 
-/** Drizzle WHERE clause for structural hard filters (excludes property type — use propertyTypesMatch in JS). */
+/**
+ * Wide pre-filter for the DB — keeps a large candidate set so the JS ranker
+ * can score everything properly. Avoids over-pruning at the DB level.
+ *
+ * Budget: +25% slack above max so stretch properties are visible.
+ * Beds/baths: allow one under the minimum so borderline properties can be scored.
+ * Suburbs: not filtered here — the ranker penalises mismatches rather than excluding.
+ */
 export function buildPropertyMatchConditions(criteria: BuyerBrief): SQL | undefined {
   const conditions: SQL[] = [
     gt(propertiesTable.price, 0),
@@ -72,28 +79,19 @@ export function buildPropertyMatchConditions(criteria: BuyerBrief): SQL | undefi
   ];
 
   if (criteria.budgetMin > 0) {
-    conditions.push(gte(propertiesTable.price, criteria.budgetMin));
+    // Allow 20% below min (some listed prices may be guides)
+    conditions.push(gte(propertiesTable.price, Math.floor(criteria.budgetMin * 0.8)));
   }
   if (Number.isFinite(criteria.budgetMax)) {
-    conditions.push(lte(propertiesTable.price, criteria.budgetMax));
+    // Allow 25% above max so stretch properties surface in the ranked list
+    conditions.push(lte(propertiesTable.price, Math.ceil(criteria.budgetMax * 1.25)));
   }
-  if (criteria.minBeds > 0) {
-    conditions.push(gte(propertiesTable.bedrooms, criteria.minBeds));
+  if (criteria.minBeds > 1) {
+    // Allow one bed under so borderline properties can be scored
+    conditions.push(gte(propertiesTable.bedrooms, criteria.minBeds - 1));
   }
-  if (criteria.minBaths > 0) {
-    conditions.push(gte(propertiesTable.bathrooms, criteria.minBaths));
-  }
-  if (criteria.parking === 'required') {
-    conditions.push(gt(propertiesTable.parkingSpaces, 0));
-  }
-
-  if (criteria.suburbs.length > 0) {
-    conditions.push(
-      sql`lower(${propertiesTable.suburb}) in (${sql.join(
-        criteria.suburbs.map((s) => sql`lower(${s})`),
-        sql`, `,
-      )})`,
-    );
+  if (criteria.minBaths > 1) {
+    conditions.push(gte(propertiesTable.bathrooms, criteria.minBaths - 1));
   }
 
   return and(...conditions);

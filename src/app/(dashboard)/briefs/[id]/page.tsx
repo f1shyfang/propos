@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import { MatchScore } from '@/components/shared/match-score';
@@ -11,29 +11,92 @@ interface BriefMatch {
   id: string; address: string; suburb: string | null; state: string | null;
   price: string; propertyType: string | null; bedrooms: number | null;
   bathrooms: number | null; parkingSpaces: number | null; days: number | null;
-  score: number; overallScore: number; underOffer: boolean; href: string;
+  score: number; overallScore: number; underOffer: boolean; imageUrl: string | null; href: string;
 }
 
 interface ShortlistItem {
   shortlistId: number; status: string; feedbackStatus: string;
   feedbackText: string | null; agentNote: string | null; sharedAt: string | null;
-  property: { id: string; address: string; suburb: string | null; price: string; score: number } | null;
+  property: { id: string; address: string; suburb: string | null; price: string; score: number; imageUrl?: string | null } | null;
 }
 
 interface Brief {
-  id: number; clientName: string; email: string; clientUserId: string | null;
+  id: number; clientName: string; email: string; phone: string; clientUserId: string | null;
+  contactMethod: string | null; engagementType: string | null; preApprovalStatus: string | null;
+  buyerType: string | null; urgency: string | null; purchasePurpose: string | null;
+  auctionWillingness: boolean | null;
   budgetMin: number | null; budgetMax: number | null; suburbs: string[];
   propertyTypes: string[]; mustHaves: string[]; dealBreakers: string[];
-  minBeds: number | null; minBaths: number | null; status: string | null;
+  minBeds: number | null; minBaths: number | null; parking: string | null; status: string | null;
 }
 
-type Tab = 'matches' | 'shortlist' | 'roadmap';
+interface FilterState {
+  // Contact
+  clientName: string; email: string; phone: string;
+  contactMethod: string; engagementType: string; preApprovalStatus: string;
+  buyerType: string; urgency: string; purchasePurpose: string;
+  auctionWillingness: boolean; status: string;
+  // Search criteria
+  budgetMin: string; budgetMax: string;
+  minBeds: string; minBaths: string;
+  parking: string;
+  suburbs: string;
+  propertyTypes: string;
+  mustHaves: string;
+  dealBreakers: string;
+}
+
+function briefToFilter(b: Brief): FilterState {
+  return {
+    clientName: b.clientName ?? '',
+    email: b.email ?? '',
+    phone: b.phone ?? '',
+    contactMethod: b.contactMethod ?? 'email',
+    engagementType: b.engagementType ?? 'full-service',
+    preApprovalStatus: b.preApprovalStatus ?? 'Not Started',
+    buyerType: b.buyerType ?? 'owner-occupier',
+    urgency: b.urgency ?? '3 months',
+    purchasePurpose: b.purchasePurpose ?? 'PPOR',
+    auctionWillingness: b.auctionWillingness ?? true,
+    status: b.status ?? 'searching',
+    budgetMin: b.budgetMin ? String(b.budgetMin) : '',
+    budgetMax: b.budgetMax ? String(b.budgetMax) : '',
+    minBeds: b.minBeds ? String(b.minBeds) : '0',
+    minBaths: b.minBaths ? String(b.minBaths) : '0',
+    parking: b.parking ?? 'nice_to_have',
+    suburbs: (b.suburbs ?? []).join(', '),
+    propertyTypes: (b.propertyTypes ?? []).join(', '),
+    mustHaves: (b.mustHaves ?? []).join(', '),
+    dealBreakers: (b.dealBreakers ?? []).join(', '),
+  };
+}
+
+function filterToParams(f: FilterState): URLSearchParams {
+  const p = new URLSearchParams();
+  if (f.budgetMin) p.set('budgetMin', f.budgetMin);
+  if (f.budgetMax) p.set('budgetMax', f.budgetMax);
+  if (f.minBeds) p.set('minBeds', f.minBeds);
+  if (f.minBaths) p.set('minBaths', f.minBaths);
+  if (f.parking) p.set('parking', f.parking);
+  const suburbs = f.suburbs.split(',').map(s => s.trim()).filter(Boolean);
+  if (suburbs.length) p.set('suburbs', suburbs.join(','));
+  const types = f.propertyTypes.split(',').map(s => s.trim()).filter(Boolean);
+  if (types.length) p.set('propertyTypes', types.join(','));
+  return p;
+}
+
+type Tab = 'matches' | 'shortlist' | 'roadmap' | 'profile';
 
 export default function BriefDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState<Tab>('matches');
-  const [data, setData] = useState<{ brief: Brief; matches: BriefMatch[]; shortlist: ShortlistItem[] } | null>(null);
+  const [brief, setBrief] = useState<Brief | null>(null);
+  const [shortlist, setShortlist] = useState<ShortlistItem[]>([]);
+  const [matches, setMatches] = useState<BriefMatch[]>([]);
+  const [matchTotal, setMatchTotal] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(false);
   const [shortlisting, setShortlisting] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [linkEmail, setLinkEmail] = useState('');
@@ -41,21 +104,113 @@ export default function BriefDetailPage() {
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [roadmap, setRoadmap] = useState<RoadmapMilestone[] | null>(null);
+  const [showFilter, setShowFilter] = useState(false);
+  const [filter, setFilter] = useState<FilterState | null>(null);
+  const [filterDraft, setFilterDraft] = useState<FilterState | null>(null);
+  const [savingFilter, setSavingFilter] = useState(false);
+  const [applyingFilter, setApplyingFilter] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const matchesOffsetRef = useRef(0);
+  const filterRef = useRef<FilterState | null>(null);
 
-  const load = useCallback(async () => {
+  const loadBrief = useCallback(async () => {
     const res = await fetch(`/api/briefs/${id}`);
-    if (res.ok) setData(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setBrief(data.brief);
+      setShortlist(data.shortlist ?? []);
+      const f = briefToFilter(data.brief);
+      setFilter(f);
+      setFilterDraft(f);
+      filterRef.current = f;
+    }
     setLoading(false);
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  const loadMatches = useCallback(async (offset: number, replace = false, customFilter?: FilterState) => {
+    setMatchesLoading(true);
+    const f = customFilter ?? filterRef.current;
+    const params = f ? filterToParams(f) : new URLSearchParams();
+    params.set('offset', String(offset));
+    const res = await fetch(`/api/briefs/${id}/matches?${params}`);
+    if (res.ok) {
+      const data = await res.json();
+      setMatches(prev => replace ? data.matches : [...prev, ...data.matches]);
+      setMatchTotal(data.total);
+      setHasMore(data.hasMore);
+      matchesOffsetRef.current = offset + data.matches.length;
+    }
+    setMatchesLoading(false);
+  }, [id]);
+
+  useEffect(() => {
+    loadBrief();
+    loadMatches(0, true);
+  }, [loadBrief, loadMatches]);
+
+  async function reloadBrief() {
+    const res = await fetch(`/api/briefs/${id}`);
+    if (res.ok) {
+      const data = await res.json();
+      setBrief(data.brief);
+      setShortlist(data.shortlist ?? []);
+    }
+  }
+
+  async function applyFilter() {
+    if (!filterDraft) return;
+    setApplyingFilter(true);
+    filterRef.current = filterDraft;
+    setFilter(filterDraft);
+    setMatches([]);
+    setMatchTotal(null);
+    await loadMatches(0, true, filterDraft);
+    setApplyingFilter(false);
+  }
+
+  async function saveFilterToBrief() {
+    if (!filterDraft) return;
+    setSavingFilter(true);
+    await fetch(`/api/briefs/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientName: filterDraft.clientName,
+        email: filterDraft.email,
+        phone: filterDraft.phone,
+        contactMethod: filterDraft.contactMethod,
+        engagementType: filterDraft.engagementType,
+        preApprovalStatus: filterDraft.preApprovalStatus,
+        buyerType: filterDraft.buyerType,
+        urgency: filterDraft.urgency,
+        purchasePurpose: filterDraft.purchasePurpose,
+        auctionWillingness: filterDraft.auctionWillingness,
+        status: filterDraft.status,
+        budgetMin: filterDraft.budgetMin ? parseInt(filterDraft.budgetMin) : null,
+        budgetMax: filterDraft.budgetMax ? parseInt(filterDraft.budgetMax) : null,
+        minBeds: parseInt(filterDraft.minBeds) || 0,
+        minBaths: parseInt(filterDraft.minBaths) || 0,
+        parking: filterDraft.parking,
+        suburbs: filterDraft.suburbs.split(',').map(s => s.trim()).filter(Boolean),
+        propertyTypes: filterDraft.propertyTypes.split(',').map(s => s.trim()).filter(Boolean),
+        mustHaves: filterDraft.mustHaves.split(',').map(s => s.trim()).filter(Boolean),
+        dealBreakers: filterDraft.dealBreakers.split(',').map(s => s.trim()).filter(Boolean),
+      }),
+    });
+    await reloadBrief();
+    filterRef.current = filterDraft;
+    setFilter(filterDraft);
+    setSavingFilter(false);
+    setMatches([]);
+    setMatchTotal(null);
+    loadMatches(0, true, filterDraft);
+  }
 
   async function toggleShortlist(propertyId: string) {
-    if (!data) return;
+    if (!brief) return;
     setShortlisting(propertyId);
-    const inList = data.shortlist.some((s) => s.property?.id === propertyId);
-    const item = data.shortlist.find((s) => s.property?.id === propertyId);
-    if (inList && item) {
+    const item = shortlist.find((s) => s.property?.id === propertyId);
+    if (item) {
       await fetch(`/api/shortlists/${item.shortlistId}`, { method: 'DELETE' });
     } else {
       await fetch('/api/shortlists', {
@@ -64,7 +219,7 @@ export default function BriefDetailPage() {
         body: JSON.stringify({ briefId: id, propertyId }),
       });
     }
-    await load();
+    await reloadBrief();
     setShortlisting(null);
   }
 
@@ -79,7 +234,7 @@ export default function BriefDetailPage() {
     const body = await res.json().catch(() => ({}));
     if (res.ok) {
       setShareMessage(`Shared ${body.sharedCount} propert${body.sharedCount === 1 ? 'y' : 'ies'} with client`);
-      await load();
+      await reloadBrief();
     } else {
       setShareMessage(body.error ?? 'Could not share');
     }
@@ -92,12 +247,12 @@ export default function BriefDetailPage() {
     const res = await fetch(`/api/briefs/${id}/link-client`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: linkEmail || data?.brief.email }),
+      body: JSON.stringify({ email: linkEmail || brief?.email }),
     });
     const body = await res.json().catch(() => ({}));
     if (res.ok) {
       setShareMessage('Client linked to this brief');
-      await load();
+      await reloadBrief();
     } else {
       setShareMessage(body.error ?? 'Could not link client');
     }
@@ -106,7 +261,7 @@ export default function BriefDetailPage() {
 
   async function removeShortlist(shortlistId: number) {
     await fetch(`/api/shortlists/${shortlistId}`, { method: 'DELETE' });
-    await load();
+    await reloadBrief();
   }
 
   function toggleCompare(propertyId: string) {
@@ -117,10 +272,17 @@ export default function BriefDetailPage() {
     );
   }
 
-  if (loading) return <div style={{ padding: 40, color: 'var(--pg-text-dim)' }}>Loading…</div>;
-  if (!data) return <div style={{ padding: 40, color: 'var(--pg-red)' }}>Brief not found.</div>;
+  function copyClientLink() {
+    const url = `${window.location.origin}/client-brief/${id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
-  const { brief, matches, shortlist } = data;
+  if (loading) return <div style={{ padding: 40, color: 'var(--pg-text-dim)' }}>Loading…</div>;
+  if (!brief) return <div style={{ padding: 40, color: 'var(--pg-red)' }}>Brief not found.</div>;
+
   const shortlistedIds = new Set(shortlist.map(s => s.property?.id).filter(Boolean));
   const fmt = (n: number | null) => n ? (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${(n / 1000).toFixed(0)}K`) : '—';
 
@@ -151,13 +313,22 @@ export default function BriefDetailPage() {
                 <Icon name="grid" size={13} />Compare {compareIds.length}
               </a>
             )}
+            <button type="button" className="pg-btn" onClick={copyClientLink}>
+              <Icon name="share" size={13} />
+              {copied ? 'Copied!' : 'Client link'}
+            </button>
             <a href={`/briefs/${id}/edit`} className="pg-btn"><Icon name="pen" size={13} />Edit brief</a>
           </div>
         </div>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 0 }}>
-          {([['matches', `${matches.length} matches`], ['shortlist', `${shortlist.length} shortlisted`], ['roadmap', 'Roadmap']] as [Tab, string][]).map(([t, l]) => (
+          {([
+            ['matches', matchTotal !== null ? `${matchTotal} matches` : 'Matches'],
+            ['shortlist', `${shortlist.length} shortlisted`],
+            ['roadmap', 'Roadmap'],
+            ['profile', 'Client profile'],
+          ] as [Tab, string][]).map(([t, l]) => (
             <button key={t} onClick={() => setTab(t)} style={{
               background: 'none', border: 'none', padding: '10px 16px 12px', fontSize: 13,
               fontWeight: tab === t ? 500 : 400,
@@ -173,56 +344,103 @@ export default function BriefDetailPage() {
       <div style={{ flex: 1, overflow: 'auto', padding: '24px 32px' }} className="pg-scroll">
         {tab === 'matches' && (
           <>
-            {matches.length === 0 ? (
+            {/* Active filter chips */}
+            {filter && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
+                {filter.suburbs.split(',').filter(s => s.trim()).map(s => (
+                  <span key={s} className="pg-badge" style={{ fontSize: 11 }}>{s.trim()}</span>
+                ))}
+                {filter.propertyTypes.split(',').filter(s => s.trim()).map(s => (
+                  <span key={s} className="pg-badge pg-badge-blue" style={{ fontSize: 11 }}>{s.trim()}</span>
+                ))}
+                {filter.budgetMax && (
+                  <span className="pg-badge" style={{ fontSize: 11 }}>
+                    up to {parseInt(filter.budgetMax) >= 1_000_000
+                      ? `$${(parseInt(filter.budgetMax) / 1_000_000).toFixed(1)}M`
+                      : `$${(parseInt(filter.budgetMax) / 1000).toFixed(0)}K`}
+                  </span>
+                )}
+                {filter.minBeds && filter.minBeds !== '0' && (
+                  <span className="pg-badge" style={{ fontSize: 11 }}>{filter.minBeds}+ beds</span>
+                )}
+                <button className="pg-btn pg-btn-sm" style={{ marginLeft: 4 }} onClick={() => setTab('profile')}>
+                  <Icon name="sliders" size={11} />Edit profile
+                </button>
+              </div>
+            )}
+
+            {matchesLoading && matches.length === 0 ? (
+              <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--pg-text-faint)', fontSize: 13 }}>
+                Finding matches…
+              </div>
+            ) : matches.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--pg-text-dim)' }}>
                 <Icon name="building" size={36} color="var(--pg-text-very-faint)" />
                 <div style={{ fontSize: 15, marginTop: 14, fontWeight: 500 }}>No matches yet</div>
-                <div style={{ fontSize: 13, marginTop: 6 }}>Add suburbs and property types to the brief to see matched properties.</div>
+                <div style={{ fontSize: 13, marginTop: 6 }}>Adjust the client profile or add suburbs to find matching properties.</div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }} className="pg-card-flat">
-                {matches.map((m, i, a) => {
-                  const inShortlist = shortlistedIds.has(m.id);
-                  const inCompare = compareIds.includes(m.id);
-                  return (
-                    <div key={m.id} className="pg-row" style={{
-                      display: 'grid', gridTemplateColumns: '28px 2.4fr 0.8fr 0.7fr 0.7fr 0.7fr 0.7fr',
-                      padding: '12px 16px', alignItems: 'center', fontSize: 13,
-                      borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
-                      gap: 12,
-                    }}>
-                      <input type="checkbox" checked={inCompare} onChange={() => toggleCompare(m.id)}
-                        disabled={!inCompare && compareIds.length >= 3}
-                        title={!inCompare && compareIds.length >= 3 ? 'Max 3 for comparison' : 'Compare'}
-                        style={{ accentColor: 'var(--pg-accent)', cursor: 'pointer' }} />
-                      <a href={m.href} style={{ display: 'flex', alignItems: 'center', gap: 11, textDecoration: 'none', color: 'inherit', minWidth: 0 }}>
-                        <PropertyThumb seed={i % 6} height={38} style={{ width: 56, flexShrink: 0, borderRadius: 5 }} />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 500, fontSize: 13 }} className="pg-truncate">{m.address}</div>
-                          <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>{m.suburb}, {m.state}</div>
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }} className="pg-card-flat">
+                  {matches.map((m, i, a) => {
+                    const inShortlist = shortlistedIds.has(m.id);
+                    const inCompare = compareIds.includes(m.id);
+                    return (
+                      <div key={m.id} className="pg-row" style={{
+                        display: 'grid', gridTemplateColumns: '28px 2.4fr 0.8fr 0.7fr 0.7fr 0.7fr 0.7fr',
+                        padding: '12px 16px', alignItems: 'center', fontSize: 13,
+                        borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
+                        gap: 12,
+                      }}>
+                        <input type="checkbox" checked={inCompare} onChange={() => toggleCompare(m.id)}
+                          disabled={!inCompare && compareIds.length >= 3}
+                          title={!inCompare && compareIds.length >= 3 ? 'Max 3 for comparison' : 'Compare'}
+                          style={{ accentColor: 'var(--pg-accent)', cursor: 'pointer' }} />
+                        <a href={m.href} style={{ display: 'flex', alignItems: 'center', gap: 11, textDecoration: 'none', color: 'inherit', minWidth: 0 }}>
+                          <PropertyThumb seed={i % 6} height={38} imageUrl={m.imageUrl} style={{ width: 56, flexShrink: 0, borderRadius: 5 }} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 500, fontSize: 13 }} className="pg-truncate">{m.address}</div>
+                            <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>{m.suburb}, {m.state}</div>
+                          </div>
+                        </a>
+                        <div><MatchScore score={m.score} size={30} stroke={3} /></div>
+                        <div className="pg-mono" style={{ fontSize: 12 }}>{m.price}</div>
+                        <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>
+                          {m.bedrooms ?? '—'}/{m.bathrooms ?? '—'}/{m.parkingSpaces ?? '—'}
                         </div>
-                      </a>
-                      <div><MatchScore score={m.score} size={30} stroke={3} /></div>
-                      <div className="pg-mono" style={{ fontSize: 12 }}>{m.price}</div>
-                      <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>
-                        {m.bedrooms ?? '—'}/{m.bathrooms ?? '—'}/{m.parkingSpaces ?? '—'}
+                        <div style={{ fontSize: 11.5, color: 'var(--pg-text-faint)' }}>
+                          {m.propertyType ?? '—'}
+                        </div>
+                        <button
+                          onClick={() => toggleShortlist(m.id)}
+                          disabled={shortlisting === m.id}
+                          className={`pg-btn pg-btn-sm ${inShortlist ? 'pg-btn-accent' : ''}`}
+                          style={{ justifyContent: 'center', whiteSpace: 'nowrap' }}
+                        >
+                          {shortlisting === m.id ? <Spinner /> : <Icon name="bookmark" size={11} />}
+                          {shortlisting === m.id ? 'Saving…' : inShortlist ? 'Saved' : 'Save'}
+                        </button>
                       </div>
-                      <div style={{ fontSize: 11.5, color: 'var(--pg-text-faint)' }}>
-                        {m.propertyType ?? '—'}
-                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Load more */}
+                {(hasMore || matchesLoading) && (
+                  <div style={{ textAlign: 'center', marginTop: 20 }}>
+                    {matchesLoading ? (
+                      <span style={{ fontSize: 13, color: 'var(--pg-text-faint)' }}>Loading more…</span>
+                    ) : (
                       <button
-                        onClick={() => toggleShortlist(m.id)}
-                        disabled={shortlisting === m.id}
-                        className={`pg-btn pg-btn-sm ${inShortlist ? 'pg-btn-accent' : ''}`}
-                        style={{ justifyContent: 'center', whiteSpace: 'nowrap' }}
+                        className="pg-btn"
+                        onClick={() => loadMatches(matchesOffsetRef.current)}
                       >
-                        <Icon name="bookmark" size={11} />
-                        {inShortlist ? 'Saved' : 'Save'}
+                        Load more ({matchTotal! - matches.length} remaining)
                       </button>
-                    </div>
-                  );
-                })}
-              </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -237,7 +455,7 @@ export default function BriefDetailPage() {
                 onClick={() => shareWithClient()}
               >
                 <Icon name="share" size={13} />
-                {sharing ? 'Sharing…' : 'Share with client'}
+                {sharing ? <><Spinner />Sharing…</> : 'Share with client'}
               </button>
               {!brief.clientUserId && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1, minWidth: 280 }}>
@@ -249,7 +467,7 @@ export default function BriefDetailPage() {
                     onChange={(e) => setLinkEmail(e.target.value)}
                   />
                   <button type="button" className="pg-btn pg-btn-sm" disabled={linking} onClick={linkClient}>
-                    {linking ? 'Linking…' : 'Link client'}
+                    {linking ? <><Spinner />Linking…</> : 'Link client'}
                   </button>
                 </div>
               )}
@@ -320,6 +538,115 @@ export default function BriefDetailPage() {
           </>
         )}
 
+        {tab === 'profile' && filterDraft && (
+          <div style={{ maxWidth: 720 }}>
+            <ProfileSection title="Contact details">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                <ProfileField label="Full name" value={filterDraft.clientName}
+                  onChange={v => setFilterDraft(d => d ? { ...d, clientName: v } : d)} />
+                <ProfileField label="Email" value={filterDraft.email}
+                  onChange={v => setFilterDraft(d => d ? { ...d, email: v } : d)} />
+                <ProfileField label="Phone" value={filterDraft.phone}
+                  onChange={v => setFilterDraft(d => d ? { ...d, phone: v } : d)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginTop: 14 }}>
+                <ProfileSelect label="Preferred contact" value={filterDraft.contactMethod}
+                  onChange={v => setFilterDraft(d => d ? { ...d, contactMethod: v } : d)}
+                  options={[['email', 'Email'], ['phone', 'Phone'], ['sms', 'SMS']]} />
+                <ProfileSelect label="Engagement type" value={filterDraft.engagementType}
+                  onChange={v => setFilterDraft(d => d ? { ...d, engagementType: v } : d)}
+                  options={[['full-service', 'Full service'], ['auction-only', 'Auction only'], ['consult', 'Consult only']]} />
+                <ProfileSelect label="Brief status" value={filterDraft.status}
+                  onChange={v => setFilterDraft(d => d ? { ...d, status: v } : d)}
+                  options={[['searching', 'Searching'], ['under-offer', 'Under offer'], ['settled', 'Settled'], ['paused', 'Paused']]} />
+              </div>
+            </ProfileSection>
+
+            <ProfileSection title="Buyer background">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                <ProfileSelect label="Buyer type" value={filterDraft.buyerType}
+                  onChange={v => setFilterDraft(d => d ? { ...d, buyerType: v } : d)}
+                  options={[['owner-occupier', 'Owner-occupier'], ['investor', 'Investor'], ['downsizer', 'Downsizer'], ['first-home', 'First home buyer']]} />
+                <ProfileSelect label="Purchase purpose" value={filterDraft.purchasePurpose}
+                  onChange={v => setFilterDraft(d => d ? { ...d, purchasePurpose: v } : d)}
+                  options={[['PPOR', 'Principal residence'], ['Investment', 'Investment'], ['Holiday', 'Holiday home']]} />
+                <ProfileSelect label="Urgency" value={filterDraft.urgency}
+                  onChange={v => setFilterDraft(d => d ? { ...d, urgency: v } : d)}
+                  options={[['ASAP', 'ASAP'], ['1 month', '1 month'], ['3 months', '3 months'], ['6 months', '6+ months']]} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginTop: 14 }}>
+                <ProfileSelect label="Pre-approval status" value={filterDraft.preApprovalStatus}
+                  onChange={v => setFilterDraft(d => d ? { ...d, preApprovalStatus: v } : d)}
+                  options={[['Not Started', 'Not started'], ['In Progress', 'In progress'], ['Approved', 'Approved'], ['Expired', 'Expired']]} />
+                <ProfileSelect label="Auction willingness" value={filterDraft.auctionWillingness ? 'yes' : 'no'}
+                  onChange={v => setFilterDraft(d => d ? { ...d, auctionWillingness: v === 'yes' } : d)}
+                  options={[['yes', 'Will bid at auction'], ['no', 'Prefers private sale']]} />
+              </div>
+            </ProfileSection>
+
+            <ProfileSection title="Search criteria">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                <ProfileField label="Budget min ($)" value={filterDraft.budgetMin} placeholder="e.g. 800000"
+                  onChange={v => setFilterDraft(d => d ? { ...d, budgetMin: v } : d)} />
+                <ProfileField label="Budget max ($)" value={filterDraft.budgetMax} placeholder="e.g. 1500000"
+                  onChange={v => setFilterDraft(d => d ? { ...d, budgetMax: v } : d)} />
+                <ProfileSelect label="Parking" value={filterDraft.parking}
+                  onChange={v => setFilterDraft(d => d ? { ...d, parking: v } : d)}
+                  options={[['not_needed', 'Not needed'], ['nice_to_have', 'Nice to have'], ['required', 'Required']]} />
+                <ProfileField label="Min bedrooms" value={filterDraft.minBeds} type="number"
+                  onChange={v => setFilterDraft(d => d ? { ...d, minBeds: v } : d)} />
+                <ProfileField label="Min bathrooms" value={filterDraft.minBaths} type="number"
+                  onChange={v => setFilterDraft(d => d ? { ...d, minBaths: v } : d)} />
+              </div>
+              <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <TagInput label="Suburbs" value={filterDraft.suburbs}
+                  placeholder="Type to search or add…"
+                  suggestions={SUBURB_SUGGESTIONS}
+                  onChange={v => setFilterDraft(d => d ? { ...d, suburbs: v } : d)} />
+                <TagInput label="Property types" value={filterDraft.propertyTypes}
+                  placeholder="Type to search or add…"
+                  suggestions={PROPERTY_TYPE_SUGGESTIONS}
+                  onChange={v => setFilterDraft(d => d ? { ...d, propertyTypes: v } : d)} />
+              </div>
+            </ProfileSection>
+
+            <ProfileSection title="Must-haves & deal-breakers">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <TagInput label="Must-haves" value={filterDraft.mustHaves}
+                  placeholder="e.g. North-facing, garage, study…"
+                  suggestions={FEATURE_SUGGESTIONS}
+                  onChange={v => setFilterDraft(d => d ? { ...d, mustHaves: v } : d)} />
+                <TagInput label="Deal-breakers" value={filterDraft.dealBreakers}
+                  placeholder="e.g. Busy road, strata, flood zone…"
+                  suggestions={FEATURE_SUGGESTIONS}
+                  onChange={v => setFilterDraft(d => d ? { ...d, dealBreakers: v } : d)} />
+              </div>
+            </ProfileSection>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                className="pg-btn pg-btn-accent"
+                disabled={applyingFilter || savingFilter}
+                onClick={() => applyFilter().then(() => setTab('matches'))}
+              >
+                {applyingFilter
+                  ? <><Spinner />Applying…</>
+                  : 'Apply preview'}
+              </button>
+              <button
+                className="pg-btn"
+                disabled={savingFilter || applyingFilter}
+                onClick={() => saveFilterToBrief().then(() => setTab('matches'))}
+              >
+                {savingFilter
+                  ? <><Spinner />Saving…</>
+                  : 'Save to profile'}
+              </button>
+              <button className="pg-btn pg-btn-ghost" disabled={savingFilter || applyingFilter} onClick={() => { setFilterDraft(filter); setTab('matches'); }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
         {tab === 'roadmap' && (
           <RoadmapTab roadmap={roadmap} onInit={() => setRoadmap(generateDefaultRoadmap(new Date()))} onChange={setRoadmap} />
         )}
@@ -327,6 +654,163 @@ export default function BriefDetailPage() {
     </div>
   );
 }
+
+function Spinner() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" style={{ animation: 'pg-spin 0.7s linear infinite', flexShrink: 0 }}>
+      <circle cx="6.5" cy="6.5" r="5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.25" />
+      <path d="M6.5 1.5 A5 5 0 0 1 11.5 6.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// ── Profile tab helpers ───────────────────────────────────────────────────────
+
+function ProfileSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--pg-text-faint)', marginBottom: 14 }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function ProfileField({ label, value, onChange, placeholder, type }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+}) {
+  return (
+    <label style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>
+      {label}
+      <input className="pg-input" type={type ?? 'text'} style={{ display: 'block', width: '100%', marginTop: 4, fontSize: 13 }}
+        placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
+    </label>
+  );
+}
+
+function ProfileSelect({ label, value, onChange, options }: {
+  label: string; value: string; onChange: (v: string) => void; options: [string, string][];
+}) {
+  return (
+    <label style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>
+      {label}
+      <select className="pg-input" style={{ display: 'block', width: '100%', marginTop: 4, fontSize: 13 }}
+        value={value} onChange={e => onChange(e.target.value)}>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function TagInput({ label, value, onChange, placeholder, suggestions }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; suggestions?: string[];
+}) {
+  const tags = value.split(',').map(s => s.trim()).filter(Boolean);
+  const [input, setInput] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const filtered = suggestions?.filter(s =>
+    s.toLowerCase().includes(input.toLowerCase()) && !tags.includes(s)
+  ) ?? [];
+
+  function addTag(tag: string) {
+    const trimmed = tag.trim();
+    if (!trimmed || tags.includes(trimmed)) return;
+    onChange([...tags, trimmed].join(', '));
+    setInput('');
+    setOpen(false);
+  }
+
+  function removeTag(tag: string) {
+    onChange(tags.filter(t => t !== tag).join(', '));
+  }
+
+  return (
+    <label style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>
+      {label}
+      <div style={{ position: 'relative', marginTop: 4 }}>
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 5, padding: '6px 8px',
+          border: '1px solid var(--pg-border)', borderRadius: 8,
+          background: 'var(--pg-bg)', minHeight: 38, alignItems: 'center',
+        }}>
+          {tags.map(t => (
+            <span key={t} style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '2px 8px', borderRadius: 999,
+              background: 'var(--pg-bg-2)', border: '1px solid var(--pg-border)',
+              fontSize: 12, color: 'var(--pg-text)',
+            }}>
+              {t}
+              <button type="button" onClick={() => removeTag(t)} style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--pg-text-faint)', fontSize: 14, lineHeight: 1, padding: 0,
+              }}>×</button>
+            </span>
+          ))}
+          <input
+            style={{ flex: 1, minWidth: 80, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: 'var(--pg-text)', fontFamily: 'var(--pg-font-body)' }}
+            placeholder={tags.length === 0 ? placeholder : 'Add…'}
+            value={input}
+            onChange={e => { setInput(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            onKeyDown={e => {
+              if ((e.key === 'Enter' || e.key === ',') && input.trim()) {
+                e.preventDefault();
+                addTag(input);
+              }
+              if (e.key === 'Backspace' && !input && tags.length) {
+                removeTag(tags[tags.length - 1]);
+              }
+            }}
+          />
+        </div>
+        {open && (filtered.length > 0 || input.trim()) && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+            background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
+            borderRadius: 8, marginTop: 2, maxHeight: 180, overflow: 'auto',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+          }}>
+            {filtered.map(s => (
+              <div key={s} onMouseDown={() => addTag(s)} style={{
+                padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--pg-text)',
+              }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--pg-bg-2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >{s}</div>
+            ))}
+            {input.trim() && !filtered.includes(input.trim()) && (
+              <div onMouseDown={() => addTag(input)} style={{
+                padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--pg-accent)',
+              }}>Add &ldquo;{input.trim()}&rdquo;</div>
+            )}
+          </div>
+        )}
+      </div>
+    </label>
+  );
+}
+
+const SUBURB_SUGGESTIONS = [
+  'Richmond', 'Fitzroy', 'Collingwood', 'Prahran', 'South Yarra', 'St Kilda',
+  'Hawthorn', 'Camberwell', 'Glen Waverley', 'Box Hill', 'Doncaster',
+  'Brighton', 'Sandringham', 'Bayside', 'Port Melbourne', 'Albert Park',
+  'Northcote', 'Preston', 'Brunswick', 'Coburg', 'Footscray',
+  'Williamstown', 'Newport', 'Yarraville', 'Altona', 'Werribee',
+];
+
+const PROPERTY_TYPE_SUGGESTIONS = [
+  'House', 'Apartment', 'Townhouse', 'Unit', 'Villa', 'Studio',
+  'Duplex', 'Terrace', 'Semi-detached', 'Acreage', 'Block of units',
+];
+
+const FEATURE_SUGGESTIONS = [
+  'North-facing', 'Garage', 'Study', 'Pool', 'Garden', 'Balcony',
+  'Double garage', 'Ensuite', 'Walk-in robe', 'Ducted heating',
+  'Air conditioning', 'Dishwasher', 'Floorboards', 'Period features',
+  'School catchment', 'Near train', 'Corner block', 'Views',
+];
 
 function RoadmapTab({ roadmap, onInit, onChange }: {
   roadmap: RoadmapMilestone[] | null;

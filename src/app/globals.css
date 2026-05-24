@@ -246,6 +246,10 @@ body {
 .pg-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 8px; }
 .pg-scroll::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.18); }
 
+@keyframes pg-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Voice agent animations */
 @keyframes voicePulse {
   0%, 100% { transform: scale(1); opacity: 0.4; }
