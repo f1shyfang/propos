@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { db } from '@/lib/db';
 import { propertiesTable, suburbsTable } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -5,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import { PropertyThumb } from '@/components/shared/property-thumb';
 import { MatchScore } from '@/components/shared/match-score';
+import { PropertyShortlistActions } from '@/components/shortlists/property-shortlist-actions';
 
 function scoreToMatchPct(overall: number | null): number {
   if (!overall) return 50;
@@ -334,16 +336,9 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
         {/* RIGHT sidebar */}
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Actions */}
-          <div className="pg-card" style={{ padding: 18 }}>
-            <button className="pg-btn pg-btn-accent" style={{ width: '100%', justifyContent: 'center', padding: '10px 12px', fontSize: 13 }}>
-              <Icon name="bookmark" size={14} strokeWidth={1.8} />
-              Add to shortlist
-            </button>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-              <button className="pg-btn" style={{ justifyContent: 'center' }}><Icon name="share" size={13} />Share</button>
-              <button className="pg-btn" style={{ justifyContent: 'center' }}><Icon name="pipeline" size={13} />Create deal</button>
-            </div>
-          </div>
+          <Suspense fallback={<div className="pg-card" style={{ padding: 18, fontSize: 13, color: 'var(--pg-text-dim)' }}>Loading actions…</div>}>
+            <PropertyShortlistActions propertyId={id} />
+          </Suspense>
 
           {/* Listing agent */}
           <div>

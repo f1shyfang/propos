@@ -25,6 +25,17 @@ export function LoginForm({ message }: { message?: string }) {
       setPending(false);
       return;
     }
+
+    const meRes = await fetch("/api/me");
+    if (meRes.ok) {
+      const me = await meRes.json();
+      if (me.role === "client") {
+        router.push("/portal");
+        router.refresh();
+        return;
+      }
+    }
+
     router.push("/dashboard");
     router.refresh();
   }

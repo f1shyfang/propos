@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { shortlistsTable, propertiesTable, buyerBriefsTable } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc, isNotNull } from 'drizzle-orm';
+import { requireRole, unauthorizedResponse } from '@/lib/auth-server';
 
 export async function GET() {
-  // Join shortlists → properties + briefs, return rows for the dashboard feed
+  const session = await requireRole('agent');
+  if (!session) return unauthorizedResponse();
+
   const rows = await db
     .select({
       shortlistId: shortlistsTable.id,
@@ -25,7 +28,8 @@ export async function GET() {
     .from(shortlistsTable)
     .innerJoin(propertiesTable, eq(shortlistsTable.propertyId, propertiesTable.id))
     .innerJoin(buyerBriefsTable, eq(shortlistsTable.briefId, buyerBriefsTable.id))
-    .orderBy(shortlistsTable.createdAt)
+    .where(isNotNull(shortlistsTable.sharedAt))
+    .orderBy(desc(shortlistsTable.feedbackAt), desc(shortlistsTable.sharedAt))
     .limit(20);
 
   return NextResponse.json({ rows });

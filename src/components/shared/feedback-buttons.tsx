@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Icon } from './icon';
 
 interface FeedbackButtonsProps {
   shortlistId: number;
   initialStatus?: string;
   initialText?: string;
+  onSaved?: () => void;
 }
 
 const BUTTONS = [
@@ -20,12 +21,13 @@ const NOT_FOR_ME_REASONS = [
   'Too small', 'Too large', 'Wrong property type',
 ];
 
-export function FeedbackButtons({ shortlistId, initialStatus = 'new', initialText = '' }: FeedbackButtonsProps) {
+export function FeedbackButtons({ shortlistId, initialStatus = 'new', initialText = '', onSaved }: FeedbackButtonsProps) {
   const [status, setStatus] = useState(initialStatus);
   const [text, setText] = useState(initialText);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const commentRef = useRef<HTMLTextAreaElement>(null);
 
   async function submit(newStatus: string, newReason?: string) {
     setSaving(true);
@@ -43,9 +45,17 @@ export function FeedbackButtons({ shortlistId, initialStatus = 'new', initialTex
     if (res.ok) {
       setStatus(newStatus);
       setSaved(true);
+      onSaved?.();
       setTimeout(() => setSaved(false), 2000);
     }
     setSaving(false);
+  }
+
+  function selectStatus(newStatus: string) {
+    submit(newStatus);
+    if (newStatus === 'need_more_info') {
+      setTimeout(() => commentRef.current?.focus(), 50);
+    }
   }
 
   return (
@@ -56,7 +66,7 @@ export function FeedbackButtons({ shortlistId, initialStatus = 'new', initialTex
           const active = status === b.id;
           return (
             <button key={b.id}
-              onClick={() => submit(b.id)}
+              onClick={() => selectStatus(b.id)}
               disabled={saving}
               style={{
                 background: active ? b.tint : 'transparent',
@@ -96,7 +106,8 @@ export function FeedbackButtons({ shortlistId, initialStatus = 'new', initialTex
 
       {/* Comment box */}
       <textarea
-        placeholder="Add a note for your agent…"
+        ref={commentRef}
+        placeholder={status === 'need_more_info' ? 'What would you like to know?' : 'Add a note for your agent…'}
         value={text}
         onChange={e => setText(e.target.value)}
         onBlur={() => { if (text !== initialText && status !== 'new') submit(status); }}
