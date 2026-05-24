@@ -18,7 +18,8 @@
     "seed:cma": "tsx scripts/seed-cma.ts",
     "seed:deals": "tsx scripts/seed-deals.ts",
     "seed:off-market": "tsx scripts/seed-off-market.ts",
-    "seed:demo-pdfs": "tsx scripts/seed-demo-pdfs.ts"
+    "seed:demo-pdfs": "tsx scripts/seed-demo-pdfs.ts",
+    "seed:briefs": "tsx scripts/seed-briefs.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",

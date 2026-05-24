@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/shared/icon';
 import {
@@ -8,14 +8,13 @@ import {
   EMPTY_BRIEF_FORM,
   MUST_HAVE_OPTIONS,
   PROPERTY_TYPES,
-  SYDNEY_SUBURBS,
   type BriefFormPayload,
 } from '@/lib/brief-field-options';
 import { buildBriefMatchesHref } from '@/lib/core-flow-utils';
 
-type BriefForm = BriefFormPayload & { suburbInput: string };
+type BriefForm = BriefFormPayload;
 
-const initial: BriefForm = { ...EMPTY_BRIEF_FORM, suburbInput: '' };
+const initial: BriefForm = { ...EMPTY_BRIEF_FORM };
 
 type AiPhase = 'idle' | 'transcribing' | 'parsing';
 
@@ -27,23 +26,24 @@ export default function NewBriefPage() {
   const [aiPhase, setAiPhase] = useState<AiPhase>('idle');
   const [aiKeys, setAiKeys] = useState<Set<string>>(new Set());
   const [aiError, setAiError] = useState<string | null>(null);
+  const [suburbSuggestions, setSuburbSuggestions] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('/api/properties/suburbs')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.suburbs) setSuburbSuggestions(d.suburbs); });
+  }, []);
 
   function set<K extends keyof BriefForm>(key: K, val: BriefForm[K]) {
     setForm(f => ({ ...f, [key]: val }));
   }
 
-  function toggle(key: 'propertyTypes' | 'mustHaves' | 'dealBreakers' | 'suburbs', val: string) {
+  function toggle(key: 'propertyTypes' | 'mustHaves' | 'dealBreakers', val: string) {
     setForm(f => {
       const arr = f[key] as string[];
       return { ...f, [key]: arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val] };
     });
-  }
-
-  function addSuburb(name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setForm(f => ({ ...f, suburbs: f.suburbs.includes(trimmed) ? f.suburbs : [...f.suburbs, trimmed], suburbInput: '' }));
   }
 
   async function handleAudioFile(file: File) {
@@ -124,10 +124,6 @@ export default function NewBriefPage() {
       setSaving(false);
     }
   }
-
-  const suburbSuggestions = form.suburbInput.length >= 1
-    ? SYDNEY_SUBURBS.filter(s => s.toLowerCase().includes(form.suburbInput.toLowerCase()) && !form.suburbs.includes(s))
-    : [];
 
   const aiLabel = (key: string) => aiKeys.has(key)
     ? <Icon name="sparkles" size={11} color="var(--pg-primary)" style={{ marginLeft: 4, verticalAlign: 'middle' }} />
@@ -258,13 +254,11 @@ export default function NewBriefPage() {
         {/* Location */}
         <Section title="Location">
           <Field label={<>Preferred suburbs{aiLabel('suburbs')}</>}>
-            <SuburbSearch
-              input={form.suburbInput}
-              onInputChange={v => set('suburbInput', v)}
+            <TagInput
+              value={form.suburbs.join(', ')}
+              placeholder="Search suburbs…"
               suggestions={suburbSuggestions}
-              selected={form.suburbs}
-              onAdd={addSuburb}
-              onRemove={s => toggle('suburbs', s)}
+              onChange={v => set('suburbs', v.split(',').map(s => s.trim()).filter(Boolean))}
             />
           </Field>
         </Section>
@@ -457,50 +451,96 @@ function ChipGroup({ values, selected, onToggle, single, format }: {
   );
 }
 
-function SuburbSearch({ input, onInputChange, suggestions, selected, onAdd, onRemove }: {
-  input: string;
-  onInputChange: (v: string) => void;
-  suggestions: readonly string[];
-  selected: string[];
-  onAdd: (s: string) => void;
-  onRemove: (s: string) => void;
+function TagInput({
+  value,
+  onChange,
+  placeholder,
+  suggestions,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  suggestions?: string[];
 }) {
+  const tags = value.split(',').map(s => s.trim()).filter(Boolean);
+  const [input, setInput] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const filtered = suggestions?.filter(
+    s => s.toLowerCase().includes(input.toLowerCase()) && !tags.includes(s),
+  ) ?? [];
+
+  function addTag(tag: string) {
+    const trimmed = tag.trim();
+    if (!trimmed || tags.includes(trimmed)) return;
+    onChange([...tags, trimmed].join(', '));
+    setInput('');
+    setOpen(false);
+  }
+
+  function removeTag(tag: string) {
+    onChange(tags.filter(t => t !== tag).join(', '));
+  }
+
   return (
-    <div>
-      <div style={{ position: 'relative' }}>
-        <input className="pg-input" style={{ width: '100%' }}
-          value={input} placeholder="Search suburbs…"
-          onChange={e => onInputChange(e.target.value)}
+    <div style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: 5, padding: '6px 8px',
+        border: '1px solid var(--pg-border)', borderRadius: 8,
+        background: 'var(--pg-bg)', minHeight: 38, alignItems: 'center',
+      }}>
+        {tags.map(t => (
+          <span key={t} style={{
+            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px',
+            borderRadius: 999, background: 'var(--pg-bg-2)', border: '1px solid var(--pg-border)',
+            fontSize: 12, color: 'var(--pg-text)',
+          }}>
+            {t}
+            <button type="button" onMouseDown={e => { e.preventDefault(); removeTag(t); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--pg-text-faint)', fontSize: 14, lineHeight: 1, padding: 0 }}>
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          style={{ flex: 1, minWidth: 80, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: 'var(--pg-text)', fontFamily: 'var(--pg-font-body)' }}
+          placeholder={tags.length === 0 ? placeholder : 'Add…'}
+          value={input}
+          onChange={e => { setInput(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
           onKeyDown={e => {
-            if (e.key === 'Enter') {
+            if ((e.key === 'Enter' || e.key === ',') && input.trim()) {
               e.preventDefault();
-              if (suggestions[0]) onAdd(suggestions[0]); else onAdd(input);
+              addTag(input);
+            }
+            if (e.key === 'Backspace' && !input && tags.length) {
+              removeTag(tags[tags.length - 1]);
             }
           }}
         />
-        {suggestions.length > 0 && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--pg-surface)', border: '1px solid var(--pg-border)', borderRadius: 8, marginTop: 4, zIndex: 10, overflow: 'hidden' }}>
-            {suggestions.slice(0, 6).map(s => (
-              <button key={s} type="button" onClick={() => onAdd(s)}
-                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}
-                className="pg-row">
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
-      {selected.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-          {selected.map(s => (
-            <span key={s} className="pg-badge pg-badge-blue" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+      {open && (filtered.length > 0 || input.trim()) && (
+        <div onMouseDown={e => e.preventDefault()} style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+          background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
+          borderRadius: 8, marginTop: 2, maxHeight: 200, overflow: 'auto',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+        }}>
+          {filtered.map(s => (
+            <div key={s} onMouseDown={() => addTag(s)}
+              style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--pg-text)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--pg-bg-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               {s}
-              <button type="button" onClick={() => onRemove(s)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', lineHeight: 1 }}>
-                <Icon name="x" size={10} />
-              </button>
-            </span>
+            </div>
           ))}
+          {input.trim() && !filtered.some(s => s.toLowerCase() === input.trim().toLowerCase()) && (
+            <div onMouseDown={() => addTag(input)}
+              style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--pg-accent)' }}>
+              Add &ldquo;{input.trim()}&rdquo;
+            </div>
+          )}
         </div>
       )}
     </div>
