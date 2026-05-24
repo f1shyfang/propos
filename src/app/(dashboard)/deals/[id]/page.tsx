@@ -485,18 +485,15 @@ function OfferTab({ deal, dealId, documents, onSave, onRefresh, saving }: {
           {saving ? 'Saving…' : 'Save offer details'}
         </button>
       </div>
-      <div style={{ marginTop: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--pg-text-faint)', marginBottom: 10 }}>
-          Offer documents
-        </div>
-        <DealDocumentActions
-          dealId={dealId}
-          documents={documents}
-          defaultTag="Offer Letter"
-          showGenerateOffer
-          onRefresh={onRefresh}
-        />
-      </div>
+      <DealDocumentPanel
+        dealId={dealId}
+        documents={documents}
+        onRefresh={onRefresh}
+        title="Offer documents"
+        defaultTag="Offer Letter"
+        tagFilter={['Offer Letter', 'Contract of Sale', 'Correspondence', 'Other']}
+        allowGenerate="offer"
+      />
     </div>
   );
 }
@@ -673,37 +670,13 @@ function ContactsTab({ dealId, contacts, onRefresh }: { dealId: string; contacts
 
 // ── Documents Tab ─────────────────────────────────────────────────────────────
 function DocumentsTab({ dealId, documents, onRefresh }: { dealId: string; documents: Document[]; onRefresh: () => Promise<void> }) {
-  async function toggleVisibility(documentId: number, clientVisible: boolean) {
-    await fetch(`/api/deals/${dealId}/documents`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ documentId, clientVisible }),
-    });
-    await onRefresh();
-  }
-
   return (
-    <div>
-      <DealDocumentActions dealId={dealId} documents={documents} onRefresh={onRefresh} />
-      {documents.length === 0 && (
-        <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--pg-text-faint)', fontSize: 13 }}>No documents yet. Upload contracts, reports and correspondence.</div>
-      )}
-      <div className="pg-card-flat" style={{ overflow: 'hidden', marginTop: 16 }}>
-        {documents.map((doc, i, a) => (
-          <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none', fontSize: 13 }}>
-            <Icon name="file-text" size={16} color="var(--pg-text-faint)" />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 500 }} className="pg-truncate">{doc.filename}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--pg-text-faint)' }}>
-                {doc.tag ?? 'Other'} · {new Date(doc.createdAt).toLocaleDateString('en-AU')}
-                {doc.status === 'pending' ? ' · uploading' : ''}
-              </div>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--pg-text-dim)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={doc.clientVisible} onChange={e => toggleVisibility(doc.id, e.target.checked)} style={{ accentColor: 'var(--pg-accent)' }} />
-              Client visible
-            </label>
-          </div>
-        ))}
-      </div>
-    </div>
+    <DealDocumentPanel
+      dealId={dealId}
+      documents={documents}
+      onRefresh={onRefresh}
+      title="All documents"
+      allowGenerate={null}
+    />
   );
 }
