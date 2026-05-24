@@ -1,5 +1,7 @@
 # 05 — System Architecture
 
+> **Canonical status:** Future/platform reference only. For the hackathon MVP, follow [../TECH-SPEC.md](../TECH-SPEC.md), [../DATA-MODEL.md](../DATA-MODEL.md), [../API-SPEC.md](../API-SPEC.md), [../ROUTE-MAP.md](../ROUTE-MAP.md), [../COMPONENT-TREE.md](../COMPONENT-TREE.md), and [../IMPLEMENTATION-PLAN.md](../IMPLEMENTATION-PLAN.md). Any API gateway, separate backend server, cron ingestion, live integrations, maps, document storage, queueing, or multi-agency architecture described here is post-MVP unless copied into the canonical docs.
+
 ## 1. High-Level Architecture
 
 ### 1.1 Overview

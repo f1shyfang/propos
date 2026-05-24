@@ -1,5 +1,7 @@
 # 09 — UI/UX & User Flows
 
+> **Canonical status:** Future/platform reference only. For the hackathon MVP, follow [../TECH-SPEC.md](../TECH-SPEC.md), [../DATA-MODEL.md](../DATA-MODEL.md), [../API-SPEC.md](../API-SPEC.md), [../ROUTE-MAP.md](../ROUTE-MAP.md), [../COMPONENT-TREE.md](../COMPONENT-TREE.md), and [../IMPLEMENTATION-PLAN.md](../IMPLEMENTATION-PLAN.md). Multi-step onboarding, autosaving wizards, strategy roadmaps, invite delivery, maps, Kanban boards, and full mobile field workflows are post-MVP.
+
 ## 1. Design Principles
 
 ### 1.1 Speed Over Beauty

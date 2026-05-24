@@ -1,5 +1,7 @@
 # 06 — Data Architecture & Integration
 
+> **Canonical status:** Future/platform reference only. For the hackathon MVP, follow [../TECH-SPEC.md](../TECH-SPEC.md), [../DATA-MODEL.md](../DATA-MODEL.md), [../API-SPEC.md](../API-SPEC.md), [../ROUTE-MAP.md](../ROUTE-MAP.md), [../COMPONENT-TREE.md](../COMPONENT-TREE.md), and [../IMPLEMENTATION-PLAN.md](../IMPLEMENTATION-PLAN.md). Live Domain/REA ingestion, government datasets, geospatial processing, maps, and valuation pipelines are explicitly post-MVP.
+
 **Version:** 1.2-draft  
 **Audience:** Hackathon team (3 engineers)  
 **Constraint:** Near-zero cost, one working city region, MVP-grade reliability  
