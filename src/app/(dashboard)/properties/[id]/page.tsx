@@ -177,6 +177,11 @@ export default async function PropertyDetailPage({
 
   const price = formatPrice(p.price, p.priceDisplay);
 
+  // Gap between asking price and AI estimated value
+  const valuationGapPct = (p.appraisedValue && p.price)
+    ? ((p.price - p.appraisedValue) / p.appraisedValue) * 100
+    : null;
+
   const propTypeLabel = p.propertyType
     ? p.propertyType.charAt(0).toUpperCase() + p.propertyType.slice(1)
     : 'Property';
@@ -243,11 +248,6 @@ export default async function PropertyDetailPage({
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Asking</div>
               <div className="pg-display" style={{ fontSize: 32, fontWeight: 500, letterSpacing: '-0.025em', lineHeight: 1.1, marginTop: 2 }}>{price}</div>
-              {p.appraisedValue && (
-                <div style={{ fontSize: 12, color: 'var(--pg-text-faint)', marginTop: 4 }}>
-                  Est. value: {formatPrice(p.appraisedValue, null)}
-                </div>
-              )}
             </div>
           </div>
 
@@ -269,6 +269,48 @@ export default async function PropertyDetailPage({
               </div>
             ))}
           </div>
+
+          {/* Valuation */}
+          {p.appraisedValue && (
+            <div style={{ marginTop: 20, borderRadius: 8, border: '1px solid var(--pg-border)', overflow: 'hidden' }}>
+              <div style={{ padding: '9px 16px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-bg-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--pg-text-dim)' }}>Valuation</span>
+                <div style={{ flex: 1 }} />
+                {valuationGapPct !== null && (
+                  <span className={`pg-badge ${valuationGapPct > 5 ? 'pg-badge-red' : valuationGapPct < -5 ? 'pg-badge-green' : 'pg-badge-yellow'}`} style={{ fontSize: 10 }}>
+                    {valuationGapPct > 5 ? 'Above appraised value' : valuationGapPct < -5 ? 'Below appraised value — potential deal' : 'Near appraised value'}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--pg-border)' }}>
+                <div style={{ padding: '12px 16px', borderRight: '1px solid var(--pg-border)' }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--pg-text-faint)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>Asking price</div>
+                  <div className="pg-display" style={{ fontSize: 20, fontWeight: 500 }}>{price}</div>
+                </div>
+                <div style={{ padding: '12px 16px' }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--pg-text-faint)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>Appraised value</div>
+                  <div className="pg-display" style={{ fontSize: 20, fontWeight: 500 }}>{formatPrice(p.appraisedValue, null)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', marginTop: 3 }}>
+                    Range: {formatPrice(Math.round(p.appraisedValue * 0.95), null)} – {formatPrice(Math.round(p.appraisedValue * 1.05), null)}
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: '10px 16px', display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)', flex: 1 }}>
+                  {valuationGapPct !== null
+                    ? valuationGapPct > 5
+                      ? `Asking is ${valuationGapPct.toFixed(1)}% above appraised value. May have room to negotiate.`
+                      : valuationGapPct < -5
+                        ? `Asking is ${Math.abs(valuationGapPct).toFixed(1)}% below appraised value — priced to sell quickly.`
+                        : `Asking is within ${Math.abs(valuationGapPct).toFixed(1)}% of appraised value — fairly priced.`
+                    : 'No valuation gap data.'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', flexShrink: 0 }}>
+                  Confidence: <span style={{ color: 'var(--pg-text)', fontWeight: 500 }}>{p.confidenceScore ?? '—'}/100</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 0, marginTop: 24, borderBottom: '1px solid var(--pg-border)' }}>
@@ -302,7 +344,7 @@ export default async function PropertyDetailPage({
 
             {/* Nearby Schools */}
             {nearbySchools.length > 0 && (
-              <div>
+              <div style={{ paddingTop: 28, borderTop: '1px solid var(--pg-border)' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>
                   <h3 className="pg-display" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Nearby Schools</h3>
                   <span style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>Closest {nearbySchools.length}</span>
@@ -330,7 +372,7 @@ export default async function PropertyDetailPage({
             )}
 
             {/* CMA table */}
-            <div>
+            <div style={{ paddingTop: 28, borderTop: '1px solid var(--pg-border)' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>
                 <h3 className="pg-display" style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Recent comparable sales</h3>
                 <span style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>Last 6 months · within 1km</span>
@@ -363,16 +405,6 @@ export default async function PropertyDetailPage({
                   </div>
                 )}
               </div>
-              {p.appraisedValue && (
-                <div style={{ marginTop: 14, padding: '14px 16px', background: 'var(--pg-bg-2)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>Estimated value range</div>
-                  <div className="pg-display" style={{ fontSize: 18, fontWeight: 500 }}>
-                    {formatPrice(p.appraisedValue ? Math.round(p.appraisedValue * 0.95) : null, null)} — {formatPrice(p.appraisedValue ? Math.round(p.appraisedValue * 1.05) : null, null)}
-                  </div>
-                  <div style={{ flex: 1 }} />
-                  <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>Confidence: <span style={{ color: 'var(--pg-text)', fontWeight: 500 }}>{p.confidenceScore ?? '—'}/100</span></div>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -446,12 +478,14 @@ export default async function PropertyDetailPage({
           </div>
 
           {/* Listing agent */}
-          <div>
-            <div className="pg-label" style={{ marginBottom: 10 }}>Listing info</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-bg-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="pg-label">Listing info</span>
+            </div>
+            <div style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
               <div className="pg-avatar pg-avatar-lg" style={{ background: 'var(--pg-bg-2)' }}>LA</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>{p.suburb ?? 'Local'} Agency</div>
+                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{p.suburb ?? 'Local'} Agency</div>
                 <div style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>Listed on realestate.com.au</div>
               </div>
               {p.url && (
@@ -464,8 +498,8 @@ export default async function PropertyDetailPage({
 
           {/* Crime & Safety */}
           {s && (s.crimeRank != null || s.violentPer1000 != null || s.propertyPer1000 != null) && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
+              <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-bg-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="pg-label">Crime &amp; Safety</span>
                 {s.crimeRank != null && (
                   <span className={`pg-badge ${s.crimeRank <= 30 ? 'pg-badge-green' : s.crimeRank <= 70 ? 'pg-badge-yellow' : 'pg-badge-red'}`} style={{ fontSize: 10 }}>
@@ -473,21 +507,21 @@ export default async function PropertyDetailPage({
                   </span>
                 )}
               </div>
-              <div className="pg-card-flat" style={{ padding: 14 }}>
+              <div style={{ padding: '0 14px' }}>
                 {s.violentPer1000 != null && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 12.5, borderBottom: '1px solid var(--pg-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: 12.5, borderBottom: '1px solid var(--pg-border)' }}>
                     <span style={{ color: 'var(--pg-text-dim)' }}>Violent crime / 1,000</span>
                     <span className="pg-mono">{s.violentPer1000.toFixed(1)}</span>
                   </div>
                 )}
                 {s.propertyPer1000 != null && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 12.5, borderBottom: s.crimeTrendSummary ? '1px solid var(--pg-border)' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: 12.5, borderBottom: s.crimeTrendSummary ? '1px solid var(--pg-border)' : 'none' }}>
                     <span style={{ color: 'var(--pg-text-dim)' }}>Property crime / 1,000</span>
                     <span className="pg-mono">{s.propertyPer1000.toFixed(1)}</span>
                   </div>
                 )}
                 {s.crimeTrendSummary && (
-                  <div style={{ paddingTop: 8, fontSize: 12, color: 'var(--pg-text-dim)', lineHeight: 1.5 }}>
+                  <div style={{ padding: '8px 0', fontSize: 12, color: 'var(--pg-text-dim)', lineHeight: 1.5 }}>
                     {s.crimeTrendSummary}
                   </div>
                 )}
@@ -496,33 +530,19 @@ export default async function PropertyDetailPage({
           )}
 
           {/* Risk overlay */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-bg-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="pg-label">Risk overlay</span>
               {risk.nsw && !risk.flood && !risk.bushfire && !risk.heritage && (
                 <span className="pg-badge pg-badge-green" style={{ fontSize: 10 }}>Low overall</span>
               )}
-              {!risk.nsw && (
-                <span className="pg-badge" style={{ fontSize: 10 }}>NSW only</span>
-              )}
+              {!risk.nsw && <span className="pg-badge" style={{ fontSize: 10 }}>NSW only</span>}
             </div>
-            <div className="pg-card-flat" style={{ padding: 14 }}>
+            <div style={{ padding: '0 14px' }}>
               {[
-                {
-                  l: 'Flood planning area',
-                  s: !risk.nsw ? 'No data' : risk.flood ? 'Affected' : 'Clear',
-                  dot: !risk.nsw ? 'var(--pg-text-very-faint)' : risk.flood ? 'var(--pg-red, #ef4444)' : 'var(--pg-green)',
-                },
-                {
-                  l: 'Bushfire prone land',
-                  s: !risk.nsw ? 'No data' : risk.bushfire ?? 'Clear',
-                  dot: !risk.nsw ? 'var(--pg-text-very-faint)' : risk.bushfire ? 'var(--pg-amber, #f59e0b)' : 'var(--pg-green)',
-                },
-                {
-                  l: 'Heritage overlay',
-                  s: !risk.nsw ? 'No data' : risk.heritage ? (risk.heritage.name ?? risk.heritage.type) : 'None listed',
-                  dot: !risk.nsw ? 'var(--pg-text-very-faint)' : risk.heritage ? 'var(--pg-amber, #f59e0b)' : 'var(--pg-green)',
-                },
+                { l: 'Flood planning area', s: !risk.nsw ? 'No data' : risk.flood ? 'Affected' : 'Clear', dot: !risk.nsw ? 'var(--pg-text-very-faint)' : risk.flood ? 'var(--pg-red, #ef4444)' : 'var(--pg-green)' },
+                { l: 'Bushfire prone land', s: !risk.nsw ? 'No data' : risk.bushfire ?? 'Clear', dot: !risk.nsw ? 'var(--pg-text-very-faint)' : risk.bushfire ? 'var(--pg-amber, #f59e0b)' : 'var(--pg-green)' },
+                { l: 'Heritage overlay', s: !risk.nsw ? 'No data' : risk.heritage ? (risk.heritage.name ?? risk.heritage.type) : 'None listed', dot: !risk.nsw ? 'var(--pg-text-very-faint)' : risk.heritage ? 'var(--pg-amber, #f59e0b)' : 'var(--pg-green)' },
               ].map((r, i, a) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '8px 0', fontSize: 12.5, borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none' }}>
                   <div style={{ width: 6, height: 6, borderRadius: 999, background: r.dot, flexShrink: 0, marginTop: 4 }} />
@@ -532,28 +552,29 @@ export default async function PropertyDetailPage({
               ))}
             </div>
             {risk.nsw && (
-              <div style={{ fontSize: 11, color: 'var(--pg-text-faint)', marginTop: 6, lineHeight: 1.4 }}>
+              <div style={{ padding: '0 14px 10px', fontSize: 11, color: 'var(--pg-text-faint)', lineHeight: 1.4 }}>
                 Source: NSW ePlanning Spatial Viewer. Flood data may not reflect latest council maps.
               </div>
             )}
           </div>
 
           {/* Feasibility */}
-          <div>
-            <div className="pg-label" style={{ marginBottom: 10 }}>Feasibility · OO · {p.state}</div>
-            <div className="pg-card-flat" style={{ padding: 14 }}>
+          <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-bg-2)' }}>
+              <span className="pg-label">Feasibility · OO · {p.state}</span>
+            </div>
+            <div style={{ padding: '0 14px' }}>
               {[
                 { l: `Stamp duty (${p.state}, OO)`, v: calcStampDuty(p.price) },
                 { l: 'Conveyancing & gov fees', v: '$2,500' },
                 { l: "Buyer's agent fee (1.5%)", v: p.price ? `$${Math.round(p.price * 0.015).toLocaleString('en-AU')}` : '—' },
               ].map((f, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 12.5 }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: 12.5, borderBottom: '1px solid var(--pg-border)' }}>
                   <span style={{ color: 'var(--pg-text-dim)' }}>{f.l}</span>
                   <span className="pg-mono">{f.v}</span>
                 </div>
               ))}
-              <div style={{ height: 1, background: 'var(--pg-border)', margin: '8px 0' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', fontSize: 13 }}>
                 <span style={{ fontWeight: 500 }}>Total acquisition</span>
                 <span className="pg-mono" style={{ fontWeight: 600 }}>
                   {p.price ? formatPrice(p.price + Math.round(p.price * 0.05) + 2500 + Math.round(p.price * 0.015), null) : '—'}
@@ -563,15 +584,17 @@ export default async function PropertyDetailPage({
           </div>
 
           {/* Activity */}
-          <div>
-            <div className="pg-label" style={{ marginBottom: 10 }}>Recent activity</div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '9px 14px', borderBottom: '1px solid var(--pg-border)', background: 'var(--pg-bg-2)' }}>
+              <span className="pg-label">Recent activity</span>
+            </div>
+            <div style={{ padding: '4px 14px' }}>
               {[
                 { d: 'Today', e: 'Property viewed', i: 'eye' as const, c: 'var(--pg-text-dim)' },
-                { d: 'Recent', e: `Matched · ${matchScore} score`, i: 'sparkles' as const, c: 'var(--pg-accent)' },
+                { d: 'Recent', e: `Matched · ${matchScore} score`, i: 'sparkles' as const, c: 'var(--pg-text-dim)' },
                 { d: 'Listed', e: `Listed for ${price}`, i: 'building' as const, c: 'var(--pg-text-dim)' },
               ].map((h, i) => (
-                <div key={i} style={{ display: 'flex', gap: 11, padding: '7px 0', fontSize: 12.5 }}>
+                <div key={i} style={{ display: 'flex', gap: 11, padding: '8px 0', fontSize: 12.5 }}>
                   <div style={{ width: 22, display: 'flex', justifyContent: 'center', paddingTop: 1 }}>
                     <Icon name={h.i} size={12} color={h.c} />
                   </div>
