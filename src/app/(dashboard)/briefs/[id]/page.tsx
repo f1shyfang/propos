@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
+import { useQueryState } from 'nuqs';
 import { Icon } from '@/components/shared/icon';
 import { MatchScore } from '@/components/shared/match-score';
 import { PropertyThumb } from '@/components/shared/property-thumb';
@@ -16,7 +17,7 @@ interface BriefMatch {
 
 interface ShortlistItem {
   shortlistId: number; status: string; feedbackStatus: string;
-  feedbackText: string | null; agentNote: string | null; sharedAt: string | null;
+  feedbackText: string | null; feedbackReason: string | null; feedbackAt: string | null; agentNote: string | null; sharedAt: string | null;
   property: { id: string; address: string; suburb: string | null; price: string; score: number; imageUrl?: string | null } | null;
 }
 
@@ -89,7 +90,7 @@ type Tab = 'matches' | 'shortlist' | 'roadmap' | 'profile';
 
 export default function BriefDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [tab, setTab] = useState<Tab>('matches');
+  const [tab, setTab] = useQueryState<Tab>('tab', { defaultValue: 'matches', parse: (v) => ((['matches','shortlist','roadmap','profile'] as const).includes(v as Tab) ? v as Tab : 'matches'), shallow: true });
   const [brief, setBrief] = useState<Brief | null>(null);
   const [shortlist, setShortlist] = useState<ShortlistItem[]>([]);
   const [matches, setMatches] = useState<BriefMatch[]>([]);
@@ -110,6 +111,7 @@ export default function BriefDetailPage() {
   const [savingFilter, setSavingFilter] = useState(false);
   const [applyingFilter, setApplyingFilter] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [suburbSuggestions, setSuburbSuggestions] = useState<string[]>([]);
   const matchesOffsetRef = useRef(0);
   const filterRef = useRef<FilterState | null>(null);
 
@@ -146,6 +148,9 @@ export default function BriefDetailPage() {
   useEffect(() => {
     loadBrief();
     loadMatches(0, true);
+    fetch('/api/properties/suburbs')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.suburbs) setSuburbSuggestions(d.suburbs); });
   }, [loadBrief, loadMatches]);
 
   async function reloadBrief() {
@@ -317,7 +322,6 @@ export default function BriefDetailPage() {
               <Icon name="share" size={13} />
               {copied ? 'Copied!' : 'Client link'}
             </button>
-            <a href={`/briefs/${id}/edit`} className="pg-btn"><Icon name="pen" size={13} />Edit brief</a>
           </div>
         </div>
 
@@ -351,7 +355,7 @@ export default function BriefDetailPage() {
                   <span key={s} className="pg-badge" style={{ fontSize: 11 }}>{s.trim()}</span>
                 ))}
                 {filter.propertyTypes.split(',').filter(s => s.trim()).map(s => (
-                  <span key={s} className="pg-badge pg-badge-blue" style={{ fontSize: 11 }}>{s.trim()}</span>
+                  <span key={s} className="pg-badge" style={{ fontSize: 11 }}>{s.trim()}</span>
                 ))}
                 {filter.budgetMax && (
                   <span className="pg-badge" style={{ fontSize: 11 }}>
@@ -447,35 +451,37 @@ export default function BriefDetailPage() {
 
         {tab === 'shortlist' && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                {!brief.clientUserId && (
+                  <>
+                    <input
+                      className="pg-input"
+                      style={{ maxWidth: 260, fontSize: 13 }}
+                      placeholder={`Client email (${brief.email})`}
+                      value={linkEmail}
+                      onChange={(e) => setLinkEmail(e.target.value)}
+                    />
+                    <button type="button" className="pg-btn pg-btn-sm" disabled={linking} onClick={linkClient}>
+                      {linking ? <><Spinner />Linking…</> : 'Link client'}
+                    </button>
+                  </>
+                )}
+                {shareMessage && (
+                  <span style={{ fontSize: 12, color: shareMessage.includes('Could') || shareMessage.includes('no linked') ? 'var(--pg-red)' : 'var(--pg-green)' }}>
+                    {shareMessage}
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
-                className="pg-btn pg-btn-accent"
+                className="pg-btn pg-btn-primary"
                 disabled={sharing || shortlist.length === 0 || !brief.clientUserId}
                 onClick={() => shareWithClient()}
               >
                 <Icon name="share" size={13} />
-                {sharing ? <><Spinner />Sharing…</> : 'Share with client'}
+                {sharing ? <><Spinner />Sharing…</> : 'Share all with client'}
               </button>
-              {!brief.clientUserId && (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1, minWidth: 280 }}>
-                  <input
-                    className="pg-input"
-                    style={{ flex: 1, fontSize: 13 }}
-                    placeholder={brief.email}
-                    value={linkEmail}
-                    onChange={(e) => setLinkEmail(e.target.value)}
-                  />
-                  <button type="button" className="pg-btn pg-btn-sm" disabled={linking} onClick={linkClient}>
-                    {linking ? <><Spinner />Linking…</> : 'Link client'}
-                  </button>
-                </div>
-              )}
-              {shareMessage && (
-                <span style={{ fontSize: 12, color: shareMessage.includes('Could') || shareMessage.includes('no linked') ? 'var(--pg-red)' : 'var(--pg-green)' }}>
-                  {shareMessage}
-                </span>
-              )}
             </div>
             {shortlist.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--pg-text-dim)' }}>
@@ -484,52 +490,90 @@ export default function BriefDetailPage() {
                 <div style={{ fontSize: 13, marginTop: 6 }}>Save properties from the Matches tab to build the shortlist.</div>
               </div>
             ) : (
-              <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid var(--pg-border)', borderRadius: 10, overflow: 'hidden' }}>
+                {/* Header */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '52px 1fr 120px 160px 160px',
+                  padding: '8px 16px', background: 'var(--pg-bg-2)',
+                  borderBottom: '1px solid var(--pg-border)', gap: 12,
+                }}>
+                  {['', 'Property', 'Price', 'Status', ''].map((h, i) => (
+                    <div key={i} className="pg-label" style={{ fontSize: 10 }}>{h}</div>
+                  ))}
+                </div>
                 {shortlist.map((s, i, a) => {
                   const p = s.property;
                   if (!p) return null;
-                  const statusColors: Record<string, string> = {
+                  const feedbackColors: Record<string, string> = {
                     interested: 'pg-badge-green', need_more_info: 'pg-badge-amber',
-                    not_for_me: 'pg-badge-red', new: '', viewed: '',
+                    not_for_me: 'pg-badge-red', new: 'pg-badge-gray', viewed: 'pg-badge-gray',
                   };
+                  const feedbackLabels: Record<string, string> = {
+                    interested: 'Interested', need_more_info: 'Need more info',
+                    not_for_me: 'Not for me', new: 'Awaiting', viewed: 'Viewed',
+                  };
+                  const hasFeedback = !!s.feedbackAt;
                   return (
                     <div key={s.shortlistId} style={{
-                      display: 'grid', gridTemplateColumns: '2.5fr 0.7fr 0.9fr 0.9fr 1.2fr',
-                      padding: '14px 16px', alignItems: 'center', fontSize: 13,
                       borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
-                      gap: 12,
+                      background: 'var(--pg-surface)',
                     }}>
-                      <div>
-                        <div style={{ fontWeight: 500 }}>{p.address}</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>{p.suburb}</div>
-                        {s.feedbackText && (
-                          <div style={{ fontSize: 12, color: 'var(--pg-text-dim)', marginTop: 4, fontStyle: 'italic' }}>
-                            &ldquo;{s.feedbackText}&rdquo;
+                      <div style={{
+                        display: 'grid', gridTemplateColumns: '52px 1fr 120px 160px 160px',
+                        padding: '12px 16px', gap: 12, alignItems: 'center', fontSize: 13,
+                      }}>
+                        <div style={{ width: 52, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+                          <PropertyThumb imageUrl={p.imageUrl ?? null} size={52} style={{ width: 52, height: 40, borderRadius: 6 }} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address}</div>
+                          <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)', marginTop: 1 }}>{p.suburb}</div>
+                        </div>
+                        <div className="pg-mono" style={{ fontSize: 12, color: 'var(--pg-text-dim)' }}>{p.price}</div>
+                        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                          {!s.sharedAt && (
+                            <span className="pg-badge pg-badge-gray" style={{ fontSize: 10 }}>Draft</span>
+                          )}
+                          <span className={`pg-badge ${feedbackColors[s.feedbackStatus] ?? 'pg-badge-gray'}`} style={{ fontSize: 11 }}>
+                            {feedbackLabels[s.feedbackStatus] ?? s.feedbackStatus.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <a href={`/properties/${p.id}`} className="pg-btn pg-btn-sm">View</a>
+                          {!s.sharedAt && brief.clientUserId && (
+                            <button type="button" className="pg-btn pg-btn-sm" onClick={() => shareWithClient([s.shortlistId])}>Share</button>
+                          )}
+                          <button type="button" className="pg-btn pg-btn-sm pg-btn-ghost" onClick={() => removeShortlist(s.shortlistId)}>Remove</button>
+                        </div>
+                      </div>
+                      {hasFeedback && (
+                        <div style={{
+                          margin: '0 16px 12px', padding: '9px 12px', borderRadius: 7,
+                          background: s.feedbackStatus === 'interested' ? 'color-mix(in srgb, var(--pg-green-tint) 50%, white)'
+                            : s.feedbackStatus === 'not_for_me' ? 'color-mix(in srgb, var(--pg-red-tint) 50%, white)'
+                            : s.feedbackStatus === 'need_more_info' ? 'color-mix(in srgb, var(--pg-amber-tint) 50%, white)'
+                            : 'var(--pg-bg-2)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 3 }}>
+                            <span className="pg-label" style={{ fontSize: 10 }}>Client feedback</span>
+                            {s.feedbackAt && (
+                              <span style={{ fontSize: 11, color: 'var(--pg-text-faint)' }}>
+                                {new Date(s.feedbackAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className="pg-mono" style={{ fontSize: 12 }}>{p.price}</div>
-                      <div>
-                        <span className={`pg-badge ${s.sharedAt ? 'pg-badge-blue' : ''}`} style={{ fontSize: 10 }}>
-                          {s.sharedAt ? 'Shared' : 'Draft'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className={`pg-badge ${statusColors[s.feedbackStatus] ?? ''}`} style={{ fontSize: 11 }}>
-                          {s.feedbackStatus.replace(/_/g, ' ')}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <a href={`/properties/${p.id}`} className="pg-btn pg-btn-sm">View</a>
-                        {!s.sharedAt && brief.clientUserId && (
-                          <button type="button" className="pg-btn pg-btn-sm" onClick={() => shareWithClient([s.shortlistId])}>
-                            Share
-                          </button>
-                        )}
-                        <button type="button" className="pg-btn pg-btn-sm pg-btn-ghost" onClick={() => removeShortlist(s.shortlistId)}>
-                          Remove
-                        </button>
-                      </div>
+                          {s.feedbackReason && (
+                            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--pg-text)', marginBottom: s.feedbackText ? 2 : 0 }}>
+                              {s.feedbackReason}
+                            </div>
+                          )}
+                          {s.feedbackText && (
+                            <div style={{ fontSize: 12, color: 'var(--pg-text-dim)', fontStyle: 'italic' }}>
+                              &ldquo;{s.feedbackText}&rdquo;
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -601,7 +645,7 @@ export default function BriefDetailPage() {
               <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <TagInput label="Suburbs" value={filterDraft.suburbs}
                   placeholder="Type to search or add…"
-                  suggestions={SUBURB_SUGGESTIONS}
+                  suggestions={suburbSuggestions}
                   onChange={v => setFilterDraft(d => d ? { ...d, suburbs: v } : d)} />
                 <TagInput label="Property types" value={filterDraft.propertyTypes}
                   placeholder="Type to search or add…"
@@ -741,7 +785,7 @@ function TagInput({ label, value, onChange, placeholder, suggestions }: {
               fontSize: 12, color: 'var(--pg-text)',
             }}>
               {t}
-              <button type="button" onClick={() => removeTag(t)} style={{
+              <button type="button" onMouseDown={e => { e.preventDefault(); removeTag(t); }} style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 color: 'var(--pg-text-faint)', fontSize: 14, lineHeight: 1, padding: 0,
               }}>×</button>
@@ -753,7 +797,7 @@ function TagInput({ label, value, onChange, placeholder, suggestions }: {
             value={input}
             onChange={e => { setInput(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
-            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            onBlur={() => setOpen(false)}
             onKeyDown={e => {
               if ((e.key === 'Enter' || e.key === ',') && input.trim()) {
                 e.preventDefault();
@@ -766,12 +810,14 @@ function TagInput({ label, value, onChange, placeholder, suggestions }: {
           />
         </div>
         {open && (filtered.length > 0 || input.trim()) && (
-          <div style={{
-            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
-            background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
-            borderRadius: 8, marginTop: 2, maxHeight: 180, overflow: 'auto',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-          }}>
+          <div
+            onMouseDown={e => e.preventDefault()}
+            style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+              background: 'var(--pg-surface)', border: '1px solid var(--pg-border)',
+              borderRadius: 8, marginTop: 2, maxHeight: 200, overflow: 'auto',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            }}>
             {filtered.map(s => (
               <div key={s} onMouseDown={() => addTag(s)} style={{
                 padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--pg-text)',
@@ -780,7 +826,7 @@ function TagInput({ label, value, onChange, placeholder, suggestions }: {
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >{s}</div>
             ))}
-            {input.trim() && !filtered.includes(input.trim()) && (
+            {input.trim() && !filtered.some(s => s.toLowerCase() === input.trim().toLowerCase()) && (
               <div onMouseDown={() => addTag(input)} style={{
                 padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--pg-accent)',
               }}>Add &ldquo;{input.trim()}&rdquo;</div>
@@ -792,13 +838,6 @@ function TagInput({ label, value, onChange, placeholder, suggestions }: {
   );
 }
 
-const SUBURB_SUGGESTIONS = [
-  'Richmond', 'Fitzroy', 'Collingwood', 'Prahran', 'South Yarra', 'St Kilda',
-  'Hawthorn', 'Camberwell', 'Glen Waverley', 'Box Hill', 'Doncaster',
-  'Brighton', 'Sandringham', 'Bayside', 'Port Melbourne', 'Albert Park',
-  'Northcote', 'Preston', 'Brunswick', 'Coburg', 'Footscray',
-  'Williamstown', 'Newport', 'Yarraville', 'Altona', 'Werribee',
-];
 
 const PROPERTY_TYPE_SUGGESTIONS = [
   'House', 'Apartment', 'Townhouse', 'Unit', 'Villa', 'Studio',

@@ -101,6 +101,8 @@ body {
   white-space: nowrap;
 }
 .pg-btn:hover { background: var(--pg-bg-2); border-color: var(--pg-border-strong); }
+.pg-btn:focus-visible { outline: 2px solid var(--pg-text-dim); outline-offset: 2px; }
+.pg-btn:focus:not(:focus-visible) { outline: none; }
 .pg-btn-primary {
   background: var(--pg-text);
   color: #FAFAF7;

@@ -28,10 +28,14 @@ export function propertyTypesMatch(briefTypes: string[], dbType: string | null |
   return briefTypes.some((bt) => canonicalKey(bt) === dbKey);
 }
 
-/** Exact case-insensitive suburb match; empty brief list skips the filter. */
+/** Exact case-insensitive suburb match; empty brief list skips the filter.
+ *  Handles "STATE - Suburb Name" format stored from the UI dropdown. */
 export function suburbMatches(briefSuburbs: string[], propertySuburb: string | null | undefined): boolean {
   if (briefSuburbs.length === 0) return true;
   if (!propertySuburb) return false;
   const lower = propertySuburb.toLowerCase();
-  return briefSuburbs.some((s) => s.toLowerCase() === lower);
+  return briefSuburbs.some((s) => {
+    const normalized = s.includes(' - ') ? s.split(' - ').slice(1).join(' - ') : s;
+    return normalized.toLowerCase() === lower;
+  });
 }
