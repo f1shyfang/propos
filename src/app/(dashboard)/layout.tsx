@@ -1,13 +1,10 @@
-import { headers } from 'next/headers';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import { Sidebar } from '@/components/shared/sidebar';
 import { QuickFind } from '@/components/shared/quick-find';
-import { auth } from '@/lib/auth';
 import { getUserDisplay } from '@/lib/user-display';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const sessionData = await auth.api.getSession({ headers: await headers() });
-  const userDisplay = getUserDisplay(sessionData?.user ?? null);
+  const userDisplay = getUserDisplay(null);
 
   return (
     <NuqsAdapter>

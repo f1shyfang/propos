@@ -1,11 +1,9 @@
 import Link from 'next/link';
-import { headers } from 'next/headers';
 
 import { AccountProfileForm } from '@/components/shared/account-profile-form';
 import { TopBar } from '@/components/shared/top-bar';
 import { Icon } from '@/components/shared/icon';
 import { SignOutButton } from '@/components/shared/sign-out-button';
-import { auth } from '@/lib/auth';
 import { getProfileFields, getUserDisplay } from '@/lib/user-display';
 
 export const dynamic = 'force-dynamic';
@@ -14,10 +12,8 @@ type SearchParams = Promise<{ error?: string; saved?: string }>;
 
 export default async function AccountPage({ searchParams }: { searchParams: SearchParams }) {
   const { error, saved } = await searchParams;
-  const sessionData = await auth.api.getSession({ headers: await headers() });
-  const user = sessionData?.user ?? null;
-  const display = getUserDisplay(user);
-  const profile = getProfileFields(user);
+  const display = getUserDisplay(null);
+  const profile = getProfileFields(null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
