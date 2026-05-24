@@ -1,83 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { sql } from 'drizzle-orm';
+import { NextRequest, NextResponse } from "next/server";
 
-function scoreToMatchPct(overall: number | null): number {
-  if (!overall) return 50;
-  return Math.min(99, Math.max(1, Math.round(overall / 100)));
-}
-
-function formatPrice(price: number | null, display: string | null): string {
-  if (display) return display;
-  if (!price || price === 0) return 'POA';
-  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(2)}M`;
-  return `$${(price / 1000).toFixed(0)}K`;
-}
+import { demoProperties, getPropertySummary } from "@/lib/demo-data";
+import { requireRole } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
-  const sp = req.nextUrl.searchParams;
-  const minLat = parseFloat(sp.get('minLat') ?? '');
-  const maxLat = parseFloat(sp.get('maxLat') ?? '');
-  const minLng = parseFloat(sp.get('minLng') ?? '');
-  const maxLng = parseFloat(sp.get('maxLng') ?? '');
-  const q = sp.get('q')?.trim() ?? '';
-  const type = sp.get('type')?.trim() ?? '';
-  const beds = parseInt(sp.get('beds') ?? '0') || 0;
+  await requireRole("agent");
 
-  if ([minLat, maxLat, minLng, maxLng].some(isNaN)) {
-    return NextResponse.json({ error: 'Invalid bounds' }, { status: 400 });
+  const searchParams = req.nextUrl.searchParams;
+  const ids = searchParams.get("ids")?.split(",").map((id) => id.trim()).filter(Boolean);
+  const suburb = searchParams.get("suburb")?.toLowerCase();
+  const propertyType = searchParams.get("property_type")?.toLowerCase() ?? searchParams.get("type")?.toLowerCase();
+  const minPrice = Number(searchParams.get("min_price") ?? 0);
+  const maxPrice = Number(searchParams.get("max_price") ?? 0);
+  const minBeds = Number(searchParams.get("min_beds") ?? searchParams.get("beds") ?? 0);
+  const minBaths = Number(searchParams.get("min_baths") ?? 0);
+  const page = Math.max(1, Number(searchParams.get("page") ?? 1));
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 25)));
+
+  let rows = [...demoProperties];
+
+  if (ids?.length) {
+    rows = rows.filter((property) => ids.includes(property.id));
+  } else {
+    if (suburb) rows = rows.filter((property) => property.suburb.toLowerCase().includes(suburb));
+    if (propertyType) rows = rows.filter((property) => property.property_type.toLowerCase().includes(propertyType));
+    if (minPrice) rows = rows.filter((property) => property.listing_price >= minPrice);
+    if (maxPrice) rows = rows.filter((property) => property.listing_price <= maxPrice);
+    if (minBeds) rows = rows.filter((property) => property.bedrooms >= minBeds);
+    if (minBaths) rows = rows.filter((property) => property.bathrooms >= minBaths);
   }
 
-  // Correct for swapped lat/lng in the DB:
-  // Valid AU lat: -45 to -10, valid AU lng: 112 to 155
-  // If a row has latitude in the lng range, columns are swapped.
-  const rows = await db.execute(sql`
-    SELECT
-      id, address, suburb, state, property_type,
-      bedrooms, bathrooms, parking_spaces,
-      price, price_display, overall_score, under_offer, days, images,
-      CASE WHEN latitude BETWEEN -45 AND -10 THEN latitude ELSE longitude END AS true_lat,
-      CASE WHEN latitude BETWEEN -45 AND -10 THEN longitude ELSE latitude END AS true_lng
-    FROM properties
-    WHERE
-      price > 0
-      AND latitude IS NOT NULL
-      AND longitude IS NOT NULL
-      AND ST_Within(
-        ST_SetSRID(
-          ST_Point(
-            CASE WHEN latitude BETWEEN -45 AND -10 THEN longitude ELSE latitude END,
-            CASE WHEN latitude BETWEEN -45 AND -10 THEN latitude ELSE longitude END
-          ),
-          4326
-        ),
-        ST_MakeEnvelope(${minLng}, ${minLat}, ${maxLng}, ${maxLat}, 4326)
-      )
-      ${q ? sql`AND (address ILIKE ${'%' + q + '%'} OR suburb ILIKE ${'%' + q + '%'} OR lga_name ILIKE ${'%' + q + '%'})` : sql``}
-      ${type ? sql`AND property_type ILIKE ${'%' + type + '%'}` : sql``}
-      ${beds ? sql`AND bedrooms >= ${beds}` : sql``}
-    ORDER BY overall_score DESC
-    LIMIT 60
-  `);
+  rows.sort((a, b) => b.listing_price - a.listing_price);
 
-  const rawRows = (rows as unknown as { rows: Array<Record<string, unknown>> }).rows ?? rows;
-  const pins = (rawRows as Array<Record<string, unknown>>).map(p => ({
-    id: p.id as string,
-    lat: Number(p.true_lat),
-    lng: Number(p.true_lng),
-    address: (p.address as string) ?? '—',
-    suburb: (p.suburb as string) ?? '—',
-    price: formatPrice(p.price as number | null, p.price_display as string | null),
-    score: scoreToMatchPct(p.overall_score as number | null),
-    underOffer: !!p.under_offer,
-    href: `/properties/${p.id}`,
-    bedrooms: p.bedrooms as number | null,
-    bathrooms: p.bathrooms as number | null,
-    parkingSpaces: p.parking_spaces as number | null,
-    propertyType: p.property_type as string | null,
-    days: p.days as number | null,
-    imageUrl: (p.images as string[] | null)?.[0] ?? null,
-  }));
+  const total = rows.length;
+  const offset = (page - 1) * limit;
+  const data = rows.slice(offset, offset + limit).map(getPropertySummary);
 
-  return NextResponse.json({ pins, count: pins.length });
+  return NextResponse.json({
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      has_more: offset + limit < total,
+    },
+  });
 }

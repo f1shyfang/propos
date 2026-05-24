@@ -1,38 +1,86 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { shortlistsTable, buyerBriefsTable } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
-import { logAction } from '@/lib/log-action';
+import { NextRequest, NextResponse } from "next/server";
+
+import {
+  demoBriefs,
+  demoProperties,
+  demoShortlists,
+  getShortlistItem,
+  logDemoAction,
+  type Shortlist,
+} from "@/lib/demo-data";
+import { requireRole } from "@/lib/session";
+
+export async function GET(req: NextRequest) {
+  await requireRole("agent");
+
+  const briefId = req.nextUrl.searchParams.get("brief_id") ?? req.nextUrl.searchParams.get("briefId");
+  if (!briefId) {
+    return NextResponse.json(
+      { error: { code: "INVALID_INPUT", message: "brief_id is required" } },
+      { status: 400 },
+    );
+  }
+
+  return NextResponse.json({
+    data: demoShortlists.filter((item) => item.buyer_brief_id === briefId).map(getShortlistItem),
+  });
+}
 
 export async function POST(req: NextRequest) {
-  const { briefId, propertyId, agentNote } = await req.json();
+  const profile = await requireRole("agent");
+  const body = await req.json();
+  const briefId = body.brief_id ?? body.briefId;
+  const propertyId = body.property_id ?? body.propertyId;
+
   if (!briefId || !propertyId) {
-    return NextResponse.json({ error: 'briefId and propertyId required' }, { status: 400 });
+    return NextResponse.json(
+      { error: { code: "INVALID_INPUT", message: "brief_id and property_id are required" } },
+      { status: 400 },
+    );
   }
 
-  // Check brief exists
-  const [brief] = await db.select().from(buyerBriefsTable).where(eq(buyerBriefsTable.id, Number(briefId)));
-  if (!brief) return NextResponse.json({ error: 'Brief not found' }, { status: 404 });
+  const brief = demoBriefs.find((item) => item.id === briefId);
+  if (!brief) {
+    return NextResponse.json({ error: { code: "NOT_FOUND", message: "Brief not found" } }, { status: 404 });
+  }
+  if (!brief.client_id) {
+    return NextResponse.json({ error: { code: "INVALID_INPUT", message: "Brief has no linked client" } }, { status: 400 });
+  }
+  if (!demoProperties.some((item) => item.id === propertyId)) {
+    return NextResponse.json({ error: { code: "NOT_FOUND", message: "Property not found" } }, { status: 404 });
+  }
 
-  // Upsert: remove if exists, add if not
-  const [existing] = await db.select().from(shortlistsTable).where(
-    and(eq(shortlistsTable.briefId, Number(briefId)), eq(shortlistsTable.propertyId, String(propertyId)))
-  );
-
+  const existing = demoShortlists.find((item) => item.buyer_brief_id === briefId && item.property_id === propertyId);
   if (existing) {
-    await db.delete(shortlistsTable).where(eq(shortlistsTable.id, existing.id));
-    logAction({ userId: String(briefId), actionType: 'shortlist_remove', entityType: 'property', entityId: String(propertyId) });
-    return NextResponse.json({ action: 'removed', id: existing.id });
+    return NextResponse.json(
+      { error: { code: "CONFLICT", message: "Property already exists in shortlist" } },
+      { status: 409 },
+    );
   }
 
-  const [shortlist] = await db.insert(shortlistsTable).values({
-    briefId: Number(briefId),
-    propertyId: String(propertyId),
-    agentNote: agentNote ?? null,
-    status: 'shortlisted',
-    feedbackStatus: 'new',
-  }).returning();
+  const createdAt = new Date().toISOString();
+  const shortlist: Shortlist = {
+    id: `shortlist-${Date.now()}`,
+    buyer_brief_id: briefId,
+    property_id: propertyId,
+    client_id: brief.client_id,
+    agent_note: body.agent_note ?? body.agentNote ?? null,
+    shared_at: body.share_now ? createdAt : null,
+    viewed_at: null,
+    feedback_status: null,
+    feedback_text: null,
+    feedback_at: null,
+    created_at: createdAt,
+  };
 
-  logAction({ userId: String(briefId), actionType: 'shortlist_add', entityType: 'property', entityId: String(propertyId) });
-  return NextResponse.json({ action: 'added', shortlist }, { status: 201 });
+  demoShortlists.unshift(shortlist);
+  logDemoAction({
+    user_id: profile.id,
+    action_type: "shortlist_add",
+    entity_type: "property",
+    entity_id: propertyId,
+    metadata: { brief_id: briefId },
+  });
+
+  return NextResponse.json({ data: getShortlistItem(shortlist) }, { status: 201 });
 }

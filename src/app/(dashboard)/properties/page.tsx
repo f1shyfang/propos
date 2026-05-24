@@ -1,65 +1,32 @@
-import { db } from '@/lib/db';
-import { propertiesTable } from '@/lib/db/schema';
-import { desc, gt, isNotNull } from 'drizzle-orm';
-import { PropertiesView } from '@/components/shared/properties-view';
-import type { PropertyPin } from '@/components/shared/properties-view';
+import { TopBar } from "@/components/shared/top-bar";
+import { Icon } from "@/components/shared/icon";
+import { demoProperties, formatCurrency } from "@/lib/demo-data";
 
-function scoreToMatchPct(overall: number | null): number {
-  if (!overall) return 50;
-  return Math.min(99, Math.max(1, Math.round(overall / 100)));
-}
-
-function formatPrice(price: number | null, display: string | null): string {
-  if (display) return display;
-  if (!price || price === 0) return 'POA';
-  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(2)}M`;
-  return `$${(price / 1000).toFixed(0)}K`;
-}
-
-export const dynamic = 'force-dynamic';
-
-export default async function PropertiesPage() {
-  // Initial load — top 60 by score. Filters are applied client-side via API.
-  const properties = await db.select()
-    .from(propertiesTable)
-    .where(gt(propertiesTable.price, 0))
-    .orderBy(desc(propertiesTable.overallScore))
-    .limit(60);
-
-  const initialPins: PropertyPin[] = properties
-    .filter(p => p.latitude && p.longitude)
-    .map(p => {
-      const rawLat = p.latitude!;
-      const rawLng = p.longitude!;
-      const isSwapped = rawLat > 0 && rawLng < 0;
-      return {
-        id: p.id,
-        lat: isSwapped ? rawLng : rawLat,
-        lng: isSwapped ? rawLat : rawLng,
-        address: p.address ?? '—',
-        suburb: p.suburb ?? '—',
-        state: p.state,
-        price: formatPrice(p.price, p.priceDisplay),
-        score: scoreToMatchPct(p.overallScore),
-        underOffer: !!p.underOffer,
-        href: `/properties/${p.id}`,
-        bedrooms: p.bedrooms,
-        bathrooms: p.bathrooms,
-        parkingSpaces: p.parkingSpaces,
-        propertyType: p.propertyType,
-        days: p.days,
-        imageUrl: p.images?.[0] ?? null,
-      };
-    });
-
-  const defaultCenter: [number, number] = initialPins.length
-    ? [
-        initialPins.reduce((s, p) => s + p.lat, 0) / initialPins.length,
-        initialPins.reduce((s, p) => s + p.lng, 0) / initialPins.length,
-      ]
-    : [-37.8136, 144.9631];
-
+export default function PropertiesPage() {
   return (
-    <PropertiesView initialPins={initialPins} defaultCenter={defaultCenter} />
+    <div>
+      <TopBar eyebrow={`${demoProperties.length} seeded properties`} title="Properties" />
+      <div style={{ padding: "24px 32px 48px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+          {demoProperties.map((property, index) => (
+            <a key={property.id} href={`/properties/${property.id}`} className="pg-card" style={{ textDecoration: "none", color: "inherit" }}>
+              <div style={{ height: 130, background: `linear-gradient(135deg, hsl(${index * 31} 34% 88%), hsl(${index * 31 + 30} 28% 78%))`, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(0,0,0,0.35)", fontWeight: 600, textTransform: "capitalize" }}>
+                {property.property_type}
+              </div>
+              <div style={{ padding: 16 }}>
+                <div style={{ fontWeight: 600 }} className="pg-truncate">{property.canonical_address}</div>
+                <div style={{ color: "var(--pg-text-dim)", fontSize: 12, marginTop: 3 }}>{property.suburb}, {property.state}</div>
+                <div style={{ display: "flex", gap: 10, marginTop: 10, color: "var(--pg-text-dim)", fontSize: 12 }}>
+                  <span><Icon name="bed" size={11} /> {property.bedrooms}</span>
+                  <span><Icon name="bath" size={11} /> {property.bathrooms}</span>
+                  <span><Icon name="car" size={11} /> {property.car_spaces}</span>
+                </div>
+                <div className="pg-mono" style={{ marginTop: 12, fontWeight: 600 }}>{formatCurrency(property.listing_price)}</div>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

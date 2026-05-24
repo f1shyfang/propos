@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Icon } from './icon';
 
 interface FeedbackButtonsProps {
-  shortlistId: number;
+  shortlistId: string | number;
   initialStatus?: string;
   initialText?: string;
 }
@@ -34,10 +34,9 @@ export function FeedbackButtons({ shortlistId, initialStatus = 'new', initialTex
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        shortlistId,
-        feedbackStatus: newStatus,
-        feedbackText: text || null,
-        feedbackReason: newReason ?? (reason || null),
+        shortlist_id: String(shortlistId),
+        feedback_status: newStatus,
+        feedback_text: text || newReason || reason || null,
       }),
     });
     if (res.ok) {

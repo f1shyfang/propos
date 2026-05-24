@@ -21,7 +21,7 @@ export interface OffMarketPropertyInput {
   howSourced?: string;
 }
 
-type ValidationResult = { ok: true } | { ok: false; error: string };
+type ValidationResult = { ok: boolean; error?: string };
 
 export function validateOffMarketProperty(input: OffMarketPropertyInput): ValidationResult {
   if (!input.address?.trim()) return { ok: false, error: 'address is required' };

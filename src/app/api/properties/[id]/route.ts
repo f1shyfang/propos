@@ -1,37 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { propertiesTable } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
-import { formatPrice } from '@/lib/utils';
+import { NextResponse } from "next/server";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+import {
+  demoCMARecords,
+  demoProperties,
+  demoRisks,
+  demoBriefs,
+  computeDemoMatch,
+  getPropertySummary,
+} from "@/lib/demo-data";
+import { requireRole } from "@/lib/session";
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  await requireRole("agent");
+
   const { id } = await params;
-  const [p] = await db.select().from(propertiesTable).where(eq(propertiesTable.id, id));
-  if (!p) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const property = demoProperties.find((item) => item.id === id);
+  if (!property) {
+    return NextResponse.json({ error: { code: "NOT_FOUND", message: "Property not found" } }, { status: 404 });
+  }
 
   return NextResponse.json({
-    property: {
-      id: p.id,
-      address: p.address,
-      suburb: p.suburb,
-      state: p.state,
-      price: formatPrice(p.price, p.priceDisplay),
-      priceDisplay: p.priceDisplay,
-      propertyType: p.propertyType,
-      bedrooms: p.bedrooms,
-      bathrooms: p.bathrooms,
-      parkingSpaces: p.parkingSpaces,
-      landSize: p.landSize,
-      overallScore: p.overallScore,
-      appraisedValue: p.appraisedValue,
-      grossYield: p.grossYield,
-      days: p.days,
-      underOffer: p.underOffer,
-      confidenceScore: p.confidenceScore,
-      rScore: p.rScore,
-      sweetspotScore: p.sweetspotScore,
-      distressScore: p.distressScore,
-      url: p.url,
+    data: {
+      property: {
+        ...getPropertySummary(property),
+        floor_area_sqm: property.floor_area_sqm,
+        description: property.raw_data.description,
+        features: property.raw_data.features,
+        listing_source: property.listing_source,
+        listing_url: property.listing_url,
+        days_on_market: property.raw_data.days_on_market,
+      },
+      cma_records: demoCMARecords.filter((record) => record.property_id === id),
+      risks: demoRisks.filter((risk) => risk.property_id === id),
+      match_scores: demoBriefs.map((brief) => ({
+        brief_id: brief.id,
+        client_name: brief.client_name,
+        match_score: computeDemoMatch(property, brief).match_score,
+      })),
     },
   });
 }

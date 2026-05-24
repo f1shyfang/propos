@@ -20,7 +20,7 @@ export interface UserActionPayload {
   metadata?: Record<string, unknown>;
 }
 
-type ValidationResult = { ok: true } | { ok: false; error: string };
+type ValidationResult = { ok: boolean; error?: string };
 
 export function validateUserAction(payload: UserActionPayload): ValidationResult {
   if (!payload.userId) return { ok: false, error: 'userId is required' };

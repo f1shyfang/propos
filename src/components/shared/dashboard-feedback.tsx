@@ -1,154 +1,98 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Icon } from './icon';
-import { MatchScore } from './match-score';
-import { PropertyThumb } from './property-thumb';
+import { useEffect, useState } from "react";
 
-interface FeedbackRow {
-  shortlistId: number;
-  feedbackStatus: string;
-  feedbackText: string | null;
-  createdAt: string;
-  feedbackAt: string | null;
-  propertyId: string;
-  address: string;
-  suburb: string | null;
-  state: string | null;
-  price: number | null;
-  priceDisplay: string | null;
-  overallScore: number | null;
-  briefId: number;
-  clientName: string;
-}
+import { Icon } from "@/components/shared/icon";
 
-const STATUS_CLASS: Record<string, string> = {
-  interested: 'pg-badge-green',
-  need_more_info: 'pg-badge-amber',
-  not_for_me: 'pg-badge-red',
-  viewed: 'pg-badge-blue',
-  new: '',
+type FeedbackRow = {
+  id: string;
+  buyer_brief_id: string;
+  property_id: string;
+  property: {
+    canonical_address: string;
+    suburb: string;
+    state: string;
+    listing_price_text: string | null;
+  } | null;
+  shared_at: string | null;
+  feedback_status: "interested" | "need_more_info" | "not_for_me" | null;
+  feedback_text: string | null;
+  feedback_at: string | null;
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  interested: 'Interested',
-  need_more_info: 'Need more info',
-  not_for_me: 'Not for me',
-  viewed: 'Viewed',
-  new: 'Awaiting',
+const statusClass = {
+  interested: "pg-badge-green",
+  need_more_info: "pg-badge-amber",
+  not_for_me: "pg-badge-red",
 };
 
-function scoreToMatchPct(overall: number | null): number {
-  if (overall == null) return 50;
-  return Math.min(99, Math.max(1, Math.round(overall / 100)));
-}
-
-function formatPrice(price: number | null, display: string | null): string {
-  if (display) return display;
-  if (!price) return '—';
-  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(2)}M`;
-  return `$${(price / 1000).toFixed(0)}K`;
-}
-
-function timeAgo(iso: string | null): string {
-  if (!iso) return '—';
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
+function timeAgo(value: string | null) {
+  if (!value) return "not yet";
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(0, Math.floor(diff / 60000));
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
 }
 
 export function DashboardFeedback() {
-  const [rows, setRows] = useState<FeedbackRow[]>([]);
+  const [items, setItems] = useState<FeedbackRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  function load() {
-    fetch('/api/dashboard/feedback')
-      .then(r => r.ok ? r.json() : { rows: [] })
-      .then(data => { setRows(data.rows ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+  async function load() {
+    const response = await fetch("/api/feedback/poll");
+    if (response.ok) {
+      const payload = await response.json();
+      setItems(payload.data.items);
+    }
+    setLoading(false);
   }
 
   useEffect(() => {
-    load();
-    const id = setInterval(load, 5000); // poll every 5s
-    return () => clearInterval(id);
+    void load();
+    const timer = setInterval(() => void load(), 3000);
+    return () => clearInterval(timer);
   }, []);
 
-  const awaitingCount = rows.filter(r => r.feedbackStatus === 'new').length;
+  const awaiting = items.filter((item) => !item.feedback_status).length;
 
   return (
     <section>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginBottom: 16 }}>
-        <h2 className="pg-display" style={{ margin: 0, fontSize: 18, fontWeight: 600, whiteSpace: 'nowrap' }}>
-          Awaiting client feedback
-        </h2>
-        <span style={{ fontSize: 12, color: 'var(--pg-text-faint)' }}>
-          {loading ? 'Loading…' : `${rows.length} propert${rows.length === 1 ? 'y' : 'ies'} shared · ${awaitingCount} still waiting`}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 14 }}>
+        <h2 className="pg-display" style={{ margin: 0, fontSize: 18 }}>Client feedback</h2>
+        <span style={{ fontSize: 12, color: "var(--pg-text-faint)" }}>
+          {loading ? "Loading..." : `${items.length} shared · ${awaiting} awaiting`}
         </span>
         <div style={{ flex: 1 }} />
-        <button className="pg-btn pg-btn-sm pg-btn-ghost" style={{ color: 'var(--pg-text-dim)' }}>
-          Nudge all <Icon name="arrow-right" size={11} />
-        </button>
+        <button className="pg-btn pg-btn-sm" onClick={() => void load()}><Icon name="clock" size={11} />Refresh</button>
       </div>
 
-      {rows.length === 0 && !loading ? (
-        <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--pg-text-faint)', fontSize: 13 }}>
-          No shortlisted properties yet. Shortlist properties from a brief to see client feedback here.
-        </div>
-      ) : (
-        <div className="pg-card-flat" style={{ overflow: 'hidden' }}>
-          <div style={{
-            display: 'grid', gridTemplateColumns: '2.2fr 1.6fr 0.8fr 1fr 1fr 0.6fr',
-            padding: '10px 16px',
-            borderBottom: '1px solid var(--pg-border)',
-            fontSize: 10.5, color: 'var(--pg-text-faint)', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500,
+      <div className="pg-card-flat" style={{ overflow: "hidden" }}>
+        {items.length === 0 && !loading ? (
+          <div style={{ padding: 24, color: "var(--pg-text-dim)", textAlign: "center" }}>No shared properties yet.</div>
+        ) : items.map((item, index) => (
+          <div key={item.id} className="pg-row" style={{
+            display: "grid",
+            gridTemplateColumns: "2fr 1fr 1fr 0.8fr",
+            gap: 16,
+            alignItems: "center",
+            padding: "14px 16px",
+            borderBottom: index < items.length - 1 ? "1px solid var(--pg-border)" : "none",
           }}>
-            <span>Property</span><span>Client</span><span>Match</span>
-            <span style={{ textAlign: 'right' }}>Price</span><span>Status</span>
-            <span style={{ textAlign: 'right' }}>Shared</span>
+            <div>
+              <div style={{ fontWeight: 600 }}>{item.property?.canonical_address ?? item.property_id}</div>
+              <div style={{ color: "var(--pg-text-dim)", fontSize: 12 }}>{item.property?.suburb}, {item.property?.state}</div>
+              {item.feedback_text && <div style={{ color: "var(--pg-text-dim)", fontSize: 12, marginTop: 5 }}>&ldquo;{item.feedback_text}&rdquo;</div>}
+            </div>
+            <span className="pg-mono" style={{ fontSize: 12 }}>{item.property?.listing_price_text}</span>
+            <span className={`pg-badge ${item.feedback_status ? statusClass[item.feedback_status] : ""}`}>
+              {item.feedback_status?.replace(/_/g, " ") ?? "Awaiting"}
+            </span>
+            <span style={{ color: "var(--pg-text-faint)", fontSize: 12, textAlign: "right" }}>{timeAgo(item.feedback_at ?? item.shared_at)}</span>
           </div>
-          {rows.map((r, i, a) => {
-            const initials = r.clientName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-            return (
-              <a key={r.shortlistId} href={`/properties/${r.propertyId}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div className="pg-row" style={{
-                  display: 'grid', gridTemplateColumns: '2.2fr 1.6fr 0.8fr 1fr 1fr 0.6fr',
-                  padding: '12px 16px', alignItems: 'center',
-                  borderBottom: i < a.length - 1 ? '1px solid var(--pg-border)' : 'none',
-                  fontSize: 13,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                    <PropertyThumb seed={i % 6} height={36} style={{ width: 56, flexShrink: 0, borderRadius: 5 }} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 500 }} className="pg-truncate">{r.address ?? '—'}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--pg-text-dim)' }}>{r.suburb}, {r.state}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-                    <div className="pg-avatar pg-avatar-sm">{initials}</div>
-                    <span className="pg-truncate">{r.clientName}</span>
-                  </div>
-                  <div><MatchScore score={scoreToMatchPct(r.overallScore)} size={28} stroke={2.5} /></div>
-                  <div style={{ textAlign: 'right', fontFamily: 'var(--pg-font-mono)' }}>
-                    {formatPrice(r.price, r.priceDisplay)}
-                  </div>
-                  <div>
-                    <span className={`pg-badge ${STATUS_CLASS[r.feedbackStatus] ?? ''}`} style={{ fontSize: 11 }}>
-                      {STATUS_LABEL[r.feedbackStatus] ?? r.feedbackStatus}
-                    </span>
-                  </div>
-                  <div style={{ textAlign: 'right', color: 'var(--pg-text-faint)', fontSize: 12 }}>
-                    {timeAgo(r.createdAt)}
-                  </div>
-                </div>
-              </a>
-            );
-          })}
-        </div>
-      )}
+        ))}
+      </div>
     </section>
   );
 }

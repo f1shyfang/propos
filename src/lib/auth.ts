@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { user, session, account, verification } from "@/lib/db/schema";
 
 export const auth = betterAuth({
-  secret: process.env.BETTER_AUTH_SECRET!,
+  secret: process.env.BETTER_AUTH_SECRET ?? "development-demo-secret-change-before-production",
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
   trustedOrigins: process.env.BETTER_AUTH_URL
     ? [process.env.BETTER_AUTH_URL]

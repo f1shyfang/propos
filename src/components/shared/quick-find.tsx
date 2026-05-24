@@ -146,7 +146,6 @@ export function QuickFind() {
           )}
 
           {!loading && Object.entries(grouped).map(([type, groupItems]) => {
-            let globalIdx = filtered.indexOf(groupItems[0]);
             return (
               <div key={type}>
                 <div style={{ padding: '8px 16px 4px', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--pg-text-faint)' }}>

@@ -1,40 +1,41 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { shortlistsTable } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
-import { logAction } from '@/lib/log-action';
+import { NextRequest, NextResponse } from "next/server";
+
+import { demoShortlists, getShortlistItem, logDemoAction, type FeedbackStatus } from "@/lib/demo-data";
+import { requireRole } from "@/lib/session";
+
+const allowed = new Set(["interested", "need_more_info", "not_for_me"]);
 
 export async function POST(req: NextRequest) {
-  const { shortlistId, feedbackStatus, feedbackText, feedbackReason } = await req.json();
+  const profile = await requireRole("client");
+  const body = await req.json();
+  const shortlistId = body.shortlist_id ?? body.shortlistId;
+  const feedbackStatus = body.feedback_status ?? body.feedbackStatus;
 
-  if (!shortlistId) return NextResponse.json({ error: 'shortlistId required' }, { status: 400 });
-
-  const validStatuses = ['new', 'viewed', 'interested', 'need_more_info', 'not_for_me'];
-  if (!validStatuses.includes(feedbackStatus)) {
-    return NextResponse.json({ error: 'Invalid feedbackStatus' }, { status: 400 });
+  if (!shortlistId || !allowed.has(feedbackStatus)) {
+    return NextResponse.json(
+      { error: { code: "INVALID_INPUT", message: "shortlist_id and valid feedback_status are required" } },
+      { status: 400 },
+    );
   }
 
-  const [updated] = await db.update(shortlistsTable)
-    .set({
-      feedbackStatus,
-      feedbackText: feedbackText ?? null,
-      feedbackReason: feedbackReason ?? null,
-      feedbackAt: new Date(),
-    })
-    .where(eq(shortlistsTable.id, Number(shortlistId)))
-    .returning();
+  const shortlist = demoShortlists.find((item) => item.id === shortlistId && item.client_id === profile.id && item.shared_at);
+  if (!shortlist) {
+    return NextResponse.json({ error: { code: "NOT_FOUND", message: "Shared shortlist row not found" } }, { status: 404 });
+  }
 
-  if (!updated) return NextResponse.json({ error: 'Shortlist item not found' }, { status: 404 });
+  const now = new Date().toISOString();
+  shortlist.viewed_at = now;
+  shortlist.feedback_status = feedbackStatus as FeedbackStatus;
+  shortlist.feedback_text = body.feedback_text ?? body.feedbackText ?? null;
+  shortlist.feedback_at = now;
 
-  logAction({ userId: 'client', actionType: 'feedback_submit', entityType: 'shortlist', entityId: String(shortlistId), metadata: { feedbackStatus } });
-  return NextResponse.json({ shortlist: updated });
-}
+  logDemoAction({
+    user_id: profile.id,
+    action_type: "feedback_submit",
+    entity_type: "shortlist",
+    entity_id: shortlist.id,
+    metadata: { feedback_status: shortlist.feedback_status },
+  });
 
-export async function GET(req: NextRequest) {
-  const sp = req.nextUrl.searchParams;
-  const briefId = parseInt(sp.get('briefId') ?? '');
-  if (isNaN(briefId)) return NextResponse.json({ error: 'briefId required' }, { status: 400 });
-
-  const items = await db.select().from(shortlistsTable).where(eq(shortlistsTable.briefId, briefId));
-  return NextResponse.json({ items });
+  return NextResponse.json({ data: getShortlistItem(shortlist), shortlist: getShortlistItem(shortlist) });
 }
